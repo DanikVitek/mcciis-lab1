@@ -20,10 +20,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
 import me.danikvitek.lab1.presentation.SimulationStatus
 import me.danikvitek.lab1.presentation.SimulationViewModel
-import java.util.*
-import kotlin.concurrent.timerTask
+import kotlin.time.Duration.Companion.seconds
 
 @Composable
 @Preview
@@ -50,8 +50,16 @@ fun AntColonyApp(
 ) {
     var citiesAmount by remember { mutableIntStateOf(10) }
     val uiState by viewModel.uiState.collectAsState()
-    var simStatus by remember { mutableStateOf(SimulationStatus.NotStarted) }
-    val timer = Timer("Simulation step", true)
+    val bestRoute by viewModel.bestRoute.collectAsState(initial = emptyList())
+    var simStatus by remember { mutableStateOf(SimulationStatus.Uninitialized) }
+
+    LaunchedEffect(simStatus) {
+        while (simStatus == SimulationStatus.Running) {
+            viewModel.step()
+            delay(1.seconds)
+        }
+    }
+
     Column(
         modifier = Modifier
             .background(MaterialTheme.colorScheme.background)
@@ -59,6 +67,10 @@ fun AntColonyApp(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceAround,
     ) {
+        Text(
+            modifier = Modifier.fillMaxWidth(),
+            text = getPlatform().name,
+        )
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
@@ -66,20 +78,46 @@ fun AntColonyApp(
                 .border(1.dp, MaterialTheme.colorScheme.onBackground),
             contentDescription = "Ant colony simulation",
         ) {
+            /** Padding from the canvas edges to draw points with */
+            val imgPadding = 8.dp.toPx()
             drawPoints(
-                points = uiState.cities.map { Offset(it.x * size.width, it.y * size.height) },
+                points = uiState.cities.map {
+                    Offset(
+                        it.x * (size.width - 2 * imgPadding) + imgPadding,
+                        it.y * (size.height - 2 * imgPadding) + imgPadding,
+                    )
+                },
                 pointMode = PointMode.Points,
                 color = Color.Black,
                 strokeWidth = 6.dp.toPx(),
                 cap = StrokeCap.Round,
             )
             drawPoints(
-                points = uiState.ants.map { ant -> Offset(ant.position.x * size.width, ant.position.y * size.height) },
+                points = uiState.ants.map { ant ->
+                    Offset(
+                        ant.position.x * (size.width - 2 * imgPadding) + imgPadding,
+                        ant.position.y * (size.height - 2 * imgPadding) + imgPadding,
+                    )
+                },
                 pointMode = PointMode.Points,
                 color = Color.Red,
                 strokeWidth = 4.dp.toPx(),
                 cap = StrokeCap.Round,
             )
+            bestRoute.takeUnless { it.isEmpty() }?.asSequence()?.forEachIndexed { idx, it ->
+                drawLine(
+                    color = Color.Blue,
+                    start = Offset(
+                        it.x * (size.width - 2 * imgPadding) + imgPadding,
+                        it.y * (size.height - 2 * imgPadding) + imgPadding,
+                    ),
+                    end = Offset(
+                        bestRoute[(idx + 1) % bestRoute.size].x * (size.width - 2 * imgPadding) + imgPadding,
+                        bestRoute[(idx + 1) % bestRoute.size].y * (size.height - 2 * imgPadding) + imgPadding,
+                    ),
+                    strokeWidth = 2.dp.toPx(),
+                )
+            }
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -87,6 +125,7 @@ fun AntColonyApp(
             horizontalArrangement = Arrangement.SpaceAround,
         ) {
             TextField(
+//                modifier = Modifier.fi
                 label = { Text("Number of cities") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -96,36 +135,9 @@ fun AntColonyApp(
                 },
             )
             Button(
-                onClick = when (simStatus) {
-                    SimulationStatus.Uninitialized -> {
-                        {
-                            viewModel.reset(citiesAmount = citiesAmount, antsAmount = citiesAmount)
-                            simStatus = SimulationStatus.NotStarted
-                        }
-                    }
-
-                    SimulationStatus.NotStarted -> {
-                        {
-                            viewModel.reset(citiesAmount = citiesAmount, antsAmount = citiesAmount)
-                        }
-                    }
-
-                    SimulationStatus.Running -> {
-                        {
-                            timer.cancel()
-                            viewModel.reset(citiesAmount = citiesAmount, antsAmount = citiesAmount)
-                            simStatus = SimulationStatus.NotStarted
-                        }
-                    }
-
-                    SimulationStatus.Finished -> {
-                        {
-                            timer.purge()
-                            viewModel.reset(citiesAmount = citiesAmount, antsAmount = citiesAmount)
-                            simStatus = SimulationStatus.NotStarted
-                        }
-                    }
-
+                onClick = {
+                    viewModel.reset(citiesAmount = citiesAmount, antsAmount = citiesAmount)
+                    simStatus = SimulationStatus.NotStarted
                 },
             ) {
                 Text(
@@ -134,21 +146,10 @@ fun AntColonyApp(
             }
             Button(
                 enabled = simStatus == SimulationStatus.NotStarted,
-                onClick = {
-                    timer.scheduleAtFixedRate(
-                        timerTask {
-                            if (viewModel.step() != SimulationStatus.Running) {
-                                cancel()
-                                simStatus = SimulationStatus.Finished
-                            }
-                        },
-                        0, 100,
-                    )
-                    simStatus = SimulationStatus.Running
-                },
+                onClick = { simStatus = SimulationStatus.Running },
             ) {
                 Text(
-                    text = "Run",
+                    text = if (simStatus == SimulationStatus.Running) uiState.age.toString() else "Run",
                 )
             }
         }
