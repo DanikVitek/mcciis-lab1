@@ -1,42 +1,43 @@
 package me.danikvitek.lab1.presentation
 
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.trySendBlocking
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.consumeAsFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import me.danikvitek.lab1.domain.Simulation
-import kotlin.Float
-import kotlin.Int
-import kotlin.also
-import kotlin.collections.List
-import kotlin.collections.emptyList
-import kotlin.collections.map
-import kotlin.run
-
-data class AntUIState(
-    val position: Offset,
-)
 
 data class SimulationUIState(
-    val ants: List<AntUIState> = emptyList(),
+    val ants: List<Offset> = emptyList(),
     val cities: List<Offset> = emptyList(),
+    val pheromones: Array<FloatArray> = emptyArray(),
     val age: Int = 0,
 ) {
-    fun citiesOnCanvas(canvasSize: Size) = cities.map { city ->
-        Offset(
-            x = city.x * canvasSize.width,
-            y = city.y * canvasSize.height,
-        )
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as SimulationUIState
+
+        if (age != other.age) return false
+        if (ants != other.ants) return false
+        if (cities != other.cities) return false
+        if (!pheromones.contentDeepEquals(other.pheromones)) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = age
+        result = 31 * result + ants.hashCode()
+        result = 31 * result + cities.hashCode()
+        result = 31 * result + pheromones.contentDeepHashCode()
+        return result
     }
 }
 
-class SimulationViewModel(private var simulation: Simulation? = null) : ViewModel() {
+class SimulationViewModel() : ViewModel() {
+    private var simulation: Simulation? = null
     val uiState: StateFlow<SimulationUIState>
         field = MutableStateFlow(SimulationUIState())
 
@@ -65,8 +66,8 @@ class SimulationViewModel(private var simulation: Simulation? = null) : ViewMode
             initialPheromoneLevel = initialPheromoneLevel,
         ).also {
             uiState.value = SimulationUIState(
-                ants = it.routes.map { route -> AntUIState(Offset(it.cities[route[0]])) },
                 cities = it.cities.map(::Offset),
+                pheromones = it.currentPheromones,
                 age = it.currentAge,
             )
         }
@@ -74,13 +75,16 @@ class SimulationViewModel(private var simulation: Simulation? = null) : ViewMode
     }
 
     suspend fun step(): SimulationStatus = simulation?.run {
-        if (iterate()) {
+        if (tick()) {
             return@run SimulationStatus.Finished
         }
         uiState.update {
+            // Мурахи знаходяться на індексі (currentStep - 1). Якщо step = 0, епоха тільки завершилась.
+            val currentCityIndex = if (currentStep == 0) citiesAmount - 1 else currentStep - 1
             it.copy(
-                ants = routes.map { route -> AntUIState(Offset(cities[route[0]])) },
+                ants = routes.map { route -> Offset(cities[route[currentCityIndex]]) },
                 age = currentAge,
+                pheromones = currentPheromones,
             )
         }
         return@run SimulationStatus.Running

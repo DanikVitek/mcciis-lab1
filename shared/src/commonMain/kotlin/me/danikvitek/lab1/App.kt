@@ -1,5 +1,8 @@
 package me.danikvitek.lab1
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateOffsetAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,13 +26,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import me.danikvitek.lab1.presentation.SimulationStatus
 import me.danikvitek.lab1.presentation.SimulationViewModel
-import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 @Preview
-fun App(
-
-) {
+fun App() {
     AntColonyAppTheme {
         AntColonyApp()
     }
@@ -56,7 +57,7 @@ fun AntColonyApp(
     LaunchedEffect(simStatus) {
         while (simStatus == SimulationStatus.Running) {
             viewModel.step()
-            delay(1.seconds)
+            delay(50.milliseconds)
         }
     }
 
@@ -71,6 +72,15 @@ fun AntColonyApp(
             modifier = Modifier.fillMaxWidth(),
             text = getPlatform().name,
         )
+
+        // Створюємо список анімованих позицій ДО виклику Canvas
+        val animatedAnts = uiState.ants.map {
+            animateOffsetAsState(
+                targetValue = it,
+                animationSpec = tween(durationMillis = 45, easing = LinearEasing),
+                label = "ant_movement",
+            )
+        }
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
@@ -80,45 +90,56 @@ fun AntColonyApp(
         ) {
             /** Padding from the canvas edges to draw points with */
             val imgPadding = 8.dp.toPx()
+
+            fun Offset.toCanvasPos() = Offset(
+                x = this.x * (size.width - 2 * imgPadding) + imgPadding,
+                y = this.y * (size.height - 2 * imgPadding) + imgPadding,
+            )
+
+            if (uiState.pheromones.isNotEmpty()) {
+                val maxPheromone = uiState.pheromones.maxOf { it.maxOrNull() ?: 0f }
+                for (i in uiState.cities.indices) {
+                    for (j in uiState.cities.indices) {
+                        val level = uiState.pheromones[i][j]
+                        if (i != j && level > 0.01f) { // Малюємо лише якщо є феромон
+                            val intensity = (level / maxPheromone).coerceIn(0f, 1f)
+                            drawLine(
+                                color = Color.Green.copy(alpha = intensity),
+                                start = uiState.cities[i].toCanvasPos(),
+                                end = uiState.cities[j].toCanvasPos(),
+                                strokeWidth = (intensity * 4.dp.toPx()).coerceAtLeast(1f),
+                            )
+                        }
+                    }
+                }
+            }
+
+            bestRoute.takeUnless { it.isEmpty() }?.forEachIndexed { idx, it ->
+                drawLine(
+                    color = Color.Blue,
+                    start = it.toCanvasPos(),
+                    end = bestRoute[(idx + 1) % bestRoute.size].toCanvasPos(),
+                    strokeWidth = 2.dp.toPx(),
+                )
+            }
+
             drawPoints(
-                points = uiState.cities.map {
-                    Offset(
-                        it.x * (size.width - 2 * imgPadding) + imgPadding,
-                        it.y * (size.height - 2 * imgPadding) + imgPadding,
-                    )
-                },
+                points = uiState.cities.map(Offset::toCanvasPos),
                 pointMode = PointMode.Points,
                 color = Color.Black,
                 strokeWidth = 6.dp.toPx(),
                 cap = StrokeCap.Round,
             )
+
             drawPoints(
-                points = uiState.ants.map { ant ->
-                    Offset(
-                        ant.position.x * (size.width - 2 * imgPadding) + imgPadding,
-                        ant.position.y * (size.height - 2 * imgPadding) + imgPadding,
-                    )
-                },
+                points = animatedAnts.map { it.value.toCanvasPos() },
                 pointMode = PointMode.Points,
                 color = Color.Red,
                 strokeWidth = 4.dp.toPx(),
                 cap = StrokeCap.Round,
             )
-            bestRoute.takeUnless { it.isEmpty() }?.asSequence()?.forEachIndexed { idx, it ->
-                drawLine(
-                    color = Color.Blue,
-                    start = Offset(
-                        it.x * (size.width - 2 * imgPadding) + imgPadding,
-                        it.y * (size.height - 2 * imgPadding) + imgPadding,
-                    ),
-                    end = Offset(
-                        bestRoute[(idx + 1) % bestRoute.size].x * (size.width - 2 * imgPadding) + imgPadding,
-                        bestRoute[(idx + 1) % bestRoute.size].y * (size.height - 2 * imgPadding) + imgPadding,
-                    ),
-                    strokeWidth = 2.dp.toPx(),
-                )
-            }
         }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,

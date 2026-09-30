@@ -11,7 +11,7 @@ class Simulation(
     private val bestRouteChannel: Channel<List<Offset>>,
     private val ages: Int = 50,
     private val antsAmount: Int = 60,
-    private val citiesAmount: Int = 60,
+    val citiesAmount: Int = 60,
     private val pheromoneImportance: Float = 1F,
     private val distanceImportance: Float = 3F,
     private val pheromoneEvaporationRate: Float = 0.5F,
@@ -54,31 +54,42 @@ class Simulation(
     private val pheromones = Array(citiesAmount) {
         FloatArray(citiesAmount) { initialPheromoneLevel }
     }
+    val currentPheromones
+        get() = Array(pheromones.size) { pheromones[it].clone() }
 
     var currentAge = 0
         private set
 
-    suspend fun iterate(): Boolean = withContext(Dispatchers.Default) {
+    var currentStep = 0
+        private set
+
+    suspend fun tick(): Boolean = withContext(Dispatchers.Default) {
         if (currentAge >= ages) return@withContext true
 
-        // Випадковий порядок стартових міст
-        val startingCities = IntArray(citiesAmount) { it }.apply { shuffle() }
+        // Фаза 1: Початок епохи, розставляємо мурах у випадкові міста
+        if (currentStep == 0) {
+            val startingCities = IntArray(citiesAmount) { it }.apply { shuffle() }
+            for (k in 0..<antsAmount) {
+                routes[k][0] = startingCities[k % citiesAmount]
+            }
+            currentStep = 1
+            return@withContext false
+        }
 
-        for (k in 0 until antsAmount) {
-            routes[k][0] = startingCities[k % citiesAmount]
-
-            for (s in 1 until citiesAmount) {
+        // Фаза 2: Рух усіх мурах на одне місто вперед
+        if (currentStep < citiesAmount) {
+            val s = currentStep
+            for (k in 0..<antsAmount) {
                 val currentCity = routes[k][s - 1]
                 val probabilities = FloatArray(citiesAmount)
                 var probSum = 0f
 
-                for (nextCity in 0 until citiesAmount) {
+                for (nextCity in 0..<citiesAmount) {
                     // Перевіряємо, чи мураха вже відвідувала це місто
                     var visited = false
-                    for (v in 0 until s) {
+                    for (v in 0..<s) {
                         if (routes[k][v] == nextCity) {
-                            visited = true
-                            break
+                            visited = true; break
                         }
                     }
 
@@ -95,66 +106,58 @@ class Simulation(
                 if (probSum > 0f) {
                     val randomThreshold = Random.nextFloat() * probSum
                     var cumulativeProb = 0f
-                    for (i in 0 until citiesAmount) {
+                    for (i in 0..<citiesAmount) {
                         if (probabilities[i] > 0f) {
                             cumulativeProb += probabilities[i]
                             if (cumulativeProb >= randomThreshold) {
-                                chosenCity = i
-                                break
+                                chosenCity = i; break
                             }
                         }
                     }
                 }
-
-                // Fallback, якщо через float-округлення місто не обралось
                 if (chosenCity == -1) {
-                    for (i in 0 until citiesAmount) {
+                    for (i in 0..<citiesAmount) {
                         if (probabilities[i] > 0f) {
-                            chosenCity = i
-                            break
+                            chosenCity = i; break
                         }
                     }
                 }
-
                 routes[k][s] = chosenCity
             }
+            currentStep++
+            return@withContext false
+        }
 
-            // Підрахунок загальної довжини побудованого маршруту
+        // Фаза 3: Епоха завершена (currentStep == citiesAmount), оновлюємо феромони
+        for (k in 0..<antsAmount) {
             var currentDistance = 0f
-            for (i in 0 until citiesAmount - 1) {
+            for (i in 0..<citiesAmount - 1) {
                 currentDistance += distances[routes[k][i]][routes[k][i + 1]]
             }
             currentDistance += distances[routes[k][citiesAmount - 1]][routes[k][0]]
             routeDistances[k] = currentDistance
 
-            // Оновлення найкращого знайденого маршруту
             if (currentDistance < bestDistance) {
                 bestDistance = currentDistance
                 bestRouteChannel.send(routes[k].map { Offset(cities[it]) })
             }
         }
 
-        // 1. Випаровування старих феромонів
-        for (i in 0 until citiesAmount) {
-            for (j in 0 until citiesAmount) {
+        for (i in 0..<citiesAmount) {
+            for (j in 0..<citiesAmount) {
                 pheromones[i][j] *= (1f - pheromoneEvaporationRate)
             }
         }
 
-        // 2. Відкладання нових феромонів (чим коротший шлях, тим більше феромону)
-        for (k in 0 until antsAmount) {
+        for (k in 0..<antsAmount) {
             val pheromoneContribution = pheromoneDepositMultiplier / routeDistances[k]
-            for (i in 0 until citiesAmount - 1) {
-                val from = routes[k][i]
-                val to = routes[k][i + 1]
-                pheromones[from][to] += pheromoneContribution
+            for (i in 0..<citiesAmount - 1) {
+                pheromones[routes[k][i]][routes[k][i + 1]] += pheromoneContribution
             }
-            // Враховуємо повернення в початкове місто
-            val from = routes[k][citiesAmount - 1]
-            val to = routes[k][0]
-            pheromones[from][to] += pheromoneContribution
+            pheromones[routes[k][citiesAmount - 1]][routes[k][0]] += pheromoneContribution
         }
 
+        currentStep = 0
         currentAge++
         return@withContext currentAge >= ages
     }
