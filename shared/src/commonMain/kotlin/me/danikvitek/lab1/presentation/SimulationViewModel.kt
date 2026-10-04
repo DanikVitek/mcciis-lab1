@@ -3,14 +3,22 @@ package me.danikvitek.lab1.presentation
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.*
 import me.danikvitek.lab1.domain.Simulation
+import me.danikvitek.lab1.domain.model.CityGraph
+import me.danikvitek.lab1.domain.model.CyclicRoute
+import me.danikvitek.lab1.domain.model.Pheromone
+import me.danikvitek.lab1.domain.model.Road
+import me.danikvitek.lab1.domain.model.weightingConfig
+import me.danikvitek.lab1.util.equalsElementWise
+import me.danikvitek.lab1.util.hashCodeElementWise
+import kotlin.random.Random
 
 data class SimulationUIState(
-    val ants: List<Offset> = emptyList(),
     val cities: List<Offset> = emptyList(),
-    val pheromones: Array<FloatArray> = emptyArray(),
+    val roads: Map<Road, Pheromone> = emptyMap(),
     val age: Int = 0,
 ) {
     override fun equals(other: Any?): Boolean {
@@ -20,18 +28,17 @@ data class SimulationUIState(
         other as SimulationUIState
 
         if (age != other.age) return false
-        if (ants != other.ants) return false
-        if (cities != other.cities) return false
-        if (!pheromones.contentDeepEquals(other.pheromones)) return false
+
+        if (!cities.equalsElementWise(other.cities)) return false
+        if (!roads.equalsElementWise(other.roads)) return false
 
         return true
     }
 
     override fun hashCode(): Int {
         var result = age
-        result = 31 * result + ants.hashCode()
-        result = 31 * result + cities.hashCode()
-        result = 31 * result + pheromones.contentDeepHashCode()
+        result = 31 * result + cities.hashCodeElementWise()
+        result = 31 * result + roads.hashCodeElementWise()
         return result
     }
 }
@@ -41,37 +48,46 @@ class SimulationViewModel() : ViewModel() {
     val uiState: StateFlow<SimulationUIState>
         field = MutableStateFlow(SimulationUIState())
 
-    private val bestRouteChannel = Channel<List<Offset>>()
-    val bestRoute: Flow<List<Offset>> = bestRouteChannel.consumeAsFlow()
+    val bestRouteChannel: ReceiveChannel<CyclicRoute>
+        field = Channel<CyclicRoute>()
+    val bestRoute: Flow<CyclicRoute> = bestRouteChannel.receiveAsFlow()
 
+    context(_: Random)
     fun reset(
         ages: Int = 50,
         antsAmount: Int = 60,
         citiesAmount: Int = 60,
+        distanceImportance: Float = 1F,
         pheromoneImportance: Float = 1F,
-        distanceImportance: Float = 3F,
-        pheromoneEvaporationRate: Float = 0.5F,
+        pheromoneDepositRate: Float = 0.5F,
         pheromoneDepositMultiplier: Float = 1F,
         initialPheromoneLevel: Float = 0.01F,
     ) {
+        val cityGraph = CityGraph.randomFullyConnected(
+            initialPheromoneLevel = Pheromone(initialPheromoneLevel),
+            citiesAmount = citiesAmount,
+        )
+        val weightingConfig = weightingConfig {
+            pheromoneImportance(pheromoneImportance)
+            distanceImportance(distanceImportance)
+            pheromoneDepositRate(pheromoneDepositRate)
+            pheromoneDepositMultiplier(pheromoneDepositMultiplier)
+        }
+
         simulation = Simulation(
             bestRouteChannel = bestRouteChannel,
             ages = ages,
             antsAmount = antsAmount,
-            citiesAmount = citiesAmount,
-            pheromoneImportance = pheromoneImportance,
-            distanceImportance = distanceImportance,
-            pheromoneEvaporationRate = pheromoneEvaporationRate,
-            pheromoneDepositMultiplier = pheromoneDepositMultiplier,
-            initialPheromoneLevel = initialPheromoneLevel,
+            graph = cityGraph,
+            weightingConfig = weightingConfig,
         ).also {
             uiState.value = SimulationUIState(
-                cities = it.cities.map(::Offset),
-                pheromones = it.currentPheromones,
+                cities = it.graph.cities,
+                roads = it.graph.roads,
                 age = it.currentAge,
             )
         }
-        bestRouteChannel.trySendBlocking(emptyList())
+        bestRouteChannel.trySendBlocking(CyclicRoute())
     }
 
     suspend fun step(): SimulationStatus = simulation?.run {
@@ -79,12 +95,9 @@ class SimulationViewModel() : ViewModel() {
             return@run SimulationStatus.Finished
         }
         uiState.update {
-            // Мурахи знаходяться на індексі (currentStep - 1). Якщо step = 0, епоха тільки завершилась.
-            val currentCityIndex = if (currentStep == 0) citiesAmount - 1 else currentStep - 1
             it.copy(
-                ants = routes.map { route -> Offset(cities[route[currentCityIndex]]) },
                 age = currentAge,
-                pheromones = currentPheromones,
+                roads = graph.roads,
             )
         }
         return@run SimulationStatus.Running
