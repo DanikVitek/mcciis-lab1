@@ -14,7 +14,7 @@ class CityGraphBuilder(val initialPheromoneLevel: Pheromone) {
     }
 
     fun twoWayRoad(city1: CityIndex, city2: CityIndex, pheromone: Pheromone = initialPheromoneLevel) =
-        roads.add(city1.value, city2.value, pheromone)
+        roads.put(city1.value, city2.value, pheromone)
 
     internal fun build() = CityGraph(cities, roads)
 }

@@ -1,6 +1,8 @@
 package me.danikvitek.lab1.domain.model
 
 import androidx.compose.ui.geometry.Offset
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentNavigableMap
 import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.sin
@@ -21,15 +23,11 @@ class CityGraph private constructor(
     init {
         if (validate) {
             require(cities.isNotEmpty()) { "Cities list cannot be empty" }
-            roads.keys.indexOfFirst { (from, to) -> from == to }.let {
-                require(it == -1) { "Roads cannot connect a city to itself (road #$it)" }
-            }
-            roads.keys.indexOfFirst { (from, to) -> from !in cities.indices || to !in cities.indices }.let {
+            roads.keys.indexOfFirst { (city1, city2) -> city1 !in cities.indices || city2 !in cities.indices }.let {
                 require(it == -1) { "Roads cannot connect to non-existent cities (road #$it)" }
             }
             cities.indices.find {
-                !(roads.keys.any { (from, to) -> from == it } &&
-                  roads.keys.any { (from, to) -> to == it })
+                !(roads.keys.any { road -> it in road })
             }.let {
                 require(it == null) {
                     "No city can be isolated, or be a sink/source of roads (i.e., all cities must have at least one incoming and one outgoing road) (city #$it)"
@@ -44,7 +42,7 @@ class CityGraph private constructor(
             val roads = MutableRoads().apply {
                 for (i in cities.indices) {
                     for (j in i + 1..cities.lastIndex) {
-                        add(i, j, initialPheromoneLevel)
+                        put(i, j, initialPheromoneLevel)
                     }
                 }
             }
@@ -91,18 +89,25 @@ class CityGraph private constructor(
     internal val mutableRoads: MutableRoads = roads
     val roads: Roads by this::mutableRoads
 
+    private val distancesCache = ConcurrentHashMap<Road, Float>()
+
     context(weighting: WeightingConfig)
-    fun accessibleCities(from: Int): Map<Int, Float> {
+    fun accessibleCities(from: Int): Map<Int, Priority> {
         val nextCities: Map<Int, Pheromone> = roads.accessibleCities(from)
         val fromPosition: Offset = cities[from]
         return nextCities.asSequence().associateBy(
             keySelector = { (cityIdx, _) -> cityIdx },
-            valueTransform = { (cityIdx, pheromone) ->
-                val distanceWeight = 1f / (fromPosition - cities[cityIdx]).getDistance()
+            valueTransform = { (to, pheromone) ->
+                val distanceWeight =
+                    1f / distancesCache.getOrPut(Road(from, to)) {
+                        (fromPosition - cities[to]).getDistance()
+                    }
                 val pheromoneWeight = pheromone.amount
 
-                distanceWeight.pow(weighting.distanceImportance) *
-                pheromoneWeight.pow(weighting.pheromoneImportance)
+                Priority(
+                    pheromoneWeight.pow(weighting.alpha) *
+                    distanceWeight.pow(weighting.beta),
+                )
             },
         )
     }

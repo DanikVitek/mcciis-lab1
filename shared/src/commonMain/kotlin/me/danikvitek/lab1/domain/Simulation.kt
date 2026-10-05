@@ -20,43 +20,56 @@ class Simulation(
     }
 
     val ants: Collection<Ant>
-        field = distributedAnts().toMutableList()
+        field = distributedAnts().toCollection(ArrayList(antsAmount))
 
-    private fun distributedAnts() = graph.cities
-        .indices
-        .shuffled(rng)
-        .asSequence()
-        .take(antsAmount)
-        .map(::Ant)
-
-    private fun resetAnts() {
-        ants.clear()
-        ants.addAll(distributedAnts())
+    private fun distributedAnts() = sequence {
+        repeat(antsAmount / graph.cities.size) {
+            graph.cities
+                .indices
+                .shuffled(rng)
+                .asSequence()
+                .map(::Ant)
+                .let { yieldAll(it) }
+        }
+        graph.cities
+            .indices
+            .shuffled(rng)
+            .asSequence()
+            .take(antsAmount % graph.cities.size)
+            .map(::Ant)
+            .let { yieldAll(it) }
     }
 
-    private fun updatePheromones() {
+    private fun resetAnts() {
+        val distributedAnts = distributedAnts().iterator()
+        ants.replaceAll { distributedAnts.next() }
+    }
+
+    private suspend fun updatePheromones() {
         val pheromoneDeltas = ants.asSequence()
             .filter {
                 val accessibleCities = graph.roads.accessibleCities(it.position).keys
                 it.canReturnToStart(accessibleCities)
             } // some routes may be incomplete, so we don't want to deposit pheromones for them
             .flatMap {
-                val routeRoads: Set<Road> =
-                    (it.visited.asSequence() + it.position)
-                        .zipWithNext()
-                        .map(::Road)
-                        .plusElement(Road(it.position, it.startPosition))
-                        .toSet()
-                val routeLength: Float =
-                    routeRoads.fold(0f) { acc, (from, to) -> acc + (graph.cities[from] - graph.cities[to]).getDistance() }
-                routeRoads.asSequence()
+                val routeRoads: Set<Road> = (it.visited.asSequence() + it.position + it.startPosition)
+                    .zipWithNext()
+                    .map(::Road)
+                    .toSet()
+                val routeLength: Float = routeRoads
+                    .map { (from, to) -> (graph.cities[from] - graph.cities[to]).getDistance() }
+                    .reduce { acc, distance -> acc + distance }
+                routeRoads
                     .associateWith { weightingConfig.pheromoneDepositMultiplier / routeLength }
                     .asSequence()
             }
             .groupingBy { it.key }
-            .aggregate { _, acc: Float?, entry, first -> if (first) entry.value else entry.value + acc!! }
+            .aggregate { _, acc: Float?, entry, first ->
+                yield()
+                if (first) entry.value else entry.value + acc!!
+            }
 
-        graph.mutableRoads.updateAllPheromones { road, oldValue ->
+        graph.mutableRoads.replaceAll { road: Road, oldValue: Pheromone ->
             Pheromone(
                 amount = weightingConfig.pheromoneEvaporationRate * oldValue.amount +
                          weightingConfig.pheromoneDepositRate * pheromoneDeltas.getOrDefault(road, 0f),
@@ -69,10 +82,17 @@ class Simulation(
 
     private var bestLengthSoFar = Float.POSITIVE_INFINITY
 
+    private var coroutine: CoroutineScope? = null
+    suspend fun cancel() {
+        coroutine?.coroutineContext[Job]?.cancelAndJoin()
+        coroutine = null
+    }
+
     suspend fun tick(): Boolean = context(rng, weightingConfig) {
         if (currentAge >= ages) return true
 
         withContext(Dispatchers.Default) {
+            coroutine = this
             val (bestLengthInGeneration, bestRouteInGeneration) = ants
                 .mapIndexed { index, ant ->
                     async(CoroutineName("ant-$index")) {

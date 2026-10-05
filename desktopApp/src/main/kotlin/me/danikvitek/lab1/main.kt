@@ -1,13 +1,14 @@
 package me.danikvitek.lab1
 
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.application
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.WindowState
+import androidx.compose.ui.window.singleWindowApplication
 
-fun main() = application {
-    Window(
-        onCloseRequest = ::exitApplication,
-        title = "Lab 1 - Ant Colony",
-    ) {
-        App()
-    }
+fun main() = singleWindowApplication(
+    state = WindowState(width = 800.dp, height = Dp.Unspecified),
+    title = "Lab 1 - Ant Colony",
+) {
+    App()
+
 }

@@ -7,11 +7,7 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.*
 import me.danikvitek.lab1.domain.Simulation
-import me.danikvitek.lab1.domain.model.CityGraph
-import me.danikvitek.lab1.domain.model.CyclicRoute
-import me.danikvitek.lab1.domain.model.Pheromone
-import me.danikvitek.lab1.domain.model.Road
-import me.danikvitek.lab1.domain.model.weightingConfig
+import me.danikvitek.lab1.domain.model.*
 import me.danikvitek.lab1.util.equalsElementWise
 import me.danikvitek.lab1.util.hashCodeElementWise
 import kotlin.random.Random
@@ -52,56 +48,75 @@ class SimulationViewModel() : ViewModel() {
         field = Channel<CyclicRoute>()
     val bestRoute: Flow<CyclicRoute> = bestRouteChannel.receiveAsFlow()
 
-    context(_: Random)
-    fun reset(
-        ages: Int = 50,
-        antsAmount: Int = 60,
-        citiesAmount: Int = 60,
-        distanceImportance: Float = 1F,
-        pheromoneImportance: Float = 1F,
-        pheromoneDepositRate: Float = 0.5F,
-        pheromoneDepositMultiplier: Float = 1F,
-        initialPheromoneLevel: Float = 0.01F,
-    ) {
-        val cityGraph = CityGraph.randomFullyConnected(
-            initialPheromoneLevel = Pheromone(initialPheromoneLevel),
-            citiesAmount = citiesAmount,
-        )
-        val weightingConfig = weightingConfig {
-            pheromoneImportance(pheromoneImportance)
-            distanceImportance(distanceImportance)
-            pheromoneDepositRate(pheromoneDepositRate)
-            pheromoneDepositMultiplier(pheromoneDepositMultiplier)
+    inner class SimulationController {
+        context(_: Random)
+        suspend fun reset(
+            ages: Int,
+            antsAmount: Int,
+            citiesAmount: Int,
+            distanceImportance: Float,
+            pheromoneImportance: Float,
+            pheromoneDepositRate: Float = 0.5F,
+            pheromoneDepositMultiplier: Float = 1F,
+            initialPheromoneLevel: Float = 0.01F,
+            preserveTopology: Boolean = false,
+        ) {
+            simulation?.cancel()
+
+            val cityGraph =
+                if (preserveTopology && simulation != null)
+                    simulation!!.graph.let {
+                        CityGraph(
+                            cities = it.cities,
+                            roads = MutableRoads(
+                                it.roads.asSequence().associateTo(mutableMapOf()) { entry ->
+                                    entry.key to Pheromone(initialPheromoneLevel)
+                                },
+                            ),
+                        )
+                    }
+                else
+                    CityGraph.randomFullyConnected(
+                        initialPheromoneLevel = Pheromone(initialPheromoneLevel),
+                        citiesAmount = citiesAmount,
+                    )
+            val weightingConfig = weightingConfig {
+                pheromoneImportance(pheromoneImportance)
+                distanceImportance(distanceImportance)
+                pheromoneDepositRate(pheromoneDepositRate)
+                pheromoneDepositMultiplier(pheromoneDepositMultiplier)
+            }
+
+            simulation = Simulation(
+                bestRouteChannel = bestRouteChannel,
+                ages = ages,
+                antsAmount = antsAmount,
+                graph = cityGraph,
+                weightingConfig = weightingConfig,
+            ).also {
+                uiState.value = SimulationUIState(
+                    cities = it.graph.cities,
+                    roads = it.graph.roads,
+                    age = it.currentAge,
+                )
+            }
+            bestRouteChannel.trySendBlocking(CyclicRoute())
         }
 
-        simulation = Simulation(
-            bestRouteChannel = bestRouteChannel,
-            ages = ages,
-            antsAmount = antsAmount,
-            graph = cityGraph,
-            weightingConfig = weightingConfig,
-        ).also {
-            uiState.value = SimulationUIState(
-                cities = it.graph.cities,
-                roads = it.graph.roads,
-                age = it.currentAge,
-            )
-        }
-        bestRouteChannel.trySendBlocking(CyclicRoute())
+        suspend fun step(): SimulationStatus = simulation?.run {
+            if (tick()) {
+                return@run SimulationStatus.Finished
+            }
+            uiState.update {
+                it.copy(
+                    age = currentAge,
+                    roads = graph.roads,
+                )
+            }
+            return@run SimulationStatus.Running
+        } ?: SimulationStatus.NotStarted
+
     }
-
-    suspend fun step(): SimulationStatus = simulation?.run {
-        if (tick()) {
-            return@run SimulationStatus.Finished
-        }
-        uiState.update {
-            it.copy(
-                age = currentAge,
-                roads = graph.roads,
-            )
-        }
-        return@run SimulationStatus.Running
-    } ?: SimulationStatus.NotStarted
 }
 
 enum class SimulationStatus {

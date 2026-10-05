@@ -13,8 +13,8 @@ data class WeightingConfig(
         require(pheromoneDepositRate in 0.0..1.0) { "Evaporation rate must be between 0 and 1" }
     }
 
-    val alpha by this::pheromoneImportance
-    val beta by this::distanceImportance
+    val alpha by this::distanceImportance
+    val beta by this::pheromoneImportance
     val rho by this::pheromoneDepositRate
     val qValue by this::pheromoneDepositMultiplier
 

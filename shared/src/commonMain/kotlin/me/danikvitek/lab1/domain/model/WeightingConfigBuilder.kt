@@ -52,12 +52,12 @@ class WeightingConfigBuilder {
     }
 
     var alpha
-        get() = pheromoneImportance
-        set(value) = pheromoneImportance(value)
-
-    var beta
         get() = distanceImportance
         set(value) = distanceImportance(value)
+
+    var beta
+        get() = pheromoneImportance
+        set(value) = pheromoneImportance(value)
 
     var rho
         get() = pheromoneDepositRate
