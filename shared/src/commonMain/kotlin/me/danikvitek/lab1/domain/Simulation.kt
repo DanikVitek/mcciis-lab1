@@ -76,19 +76,18 @@ class Simulation(
             val (bestLengthInGeneration, bestRouteInGeneration) = ants
                 .mapIndexed { index, ant ->
                     async(CoroutineName("ant-$index")) {
-                        var stuck = false
                         do {
                             val accessibleCities = graph.accessibleCities(ant.position)
-                            val stuckOrFinished = ant.chooseNext(accessibleCities)
-                            if (stuckOrFinished && (ant.cantReturnToStart(accessibleCities.keys) || ant.visited.size + 1 < graph.cities.size)) {
-                                stuck = true
-//                                yield()
-                                break
-                            }
-//                            yield()
-                        } while (!stuckOrFinished)
 
-                        if (stuck) return@async null
+                            val stuckOrFinished = ant.chooseNext(accessibleCities) == Ant.ChoiceResult.STAYED
+                            val stuck = stuckOrFinished &&
+                                        (ant.cannotReturnToStart(accessibleCities.keys) ||
+                                         ant.visited.size + 1 < graph.cities.size)
+                            if (stuck) {
+                                return@async null
+                            }
+                            yield()
+                        } while (!stuckOrFinished)
 
                         val route = (ant.visited.asSequence() + ant.position).toList()
                         var sum = 0f
@@ -131,6 +130,7 @@ class Simulation(
                 bestLengthSoFar = bestLengthInGeneration
                 bestRouteChannel.send(CyclicRoute(bestRouteInGeneration!!))
             }
+
             updateJob.join()
         }
 

@@ -33,11 +33,11 @@ class Ant(
      * @param rng The random number generator to use for choosing the next city.
      */
     context(rng: Random)
-    fun chooseNext(nextCities: Map<Int, Float>): Boolean {
-        if (nextCities.isEmpty()) return false
+    fun chooseNext(nextCities: Map<Int, Priority>): ChoiceResult {
+        if (nextCities.isEmpty()) return ChoiceResult.STAYED
 
         require(
-            nextCities.values.all { it >= 0f },
+            nextCities.values.all { it.value >= 0f },
         ) { "Weights must be non-negative" }
 
         val unvisitedCities = sequence {
@@ -48,24 +48,32 @@ class Ant(
             }
         }.toMap()
 
-        val totalWeight = unvisitedCities.values.sum()
-        if (totalWeight == 0f) return false
+        val totalWeight = unvisitedCities.values.fold(0f) { acc, it -> acc + it.value }
+        if (totalWeight == 0f) return ChoiceResult.STAYED
 
         unvisitedCities.asSequence()
-            .map(Map.Entry<Int, Float>::toPair)
+            .map(Map.Entry<Int, Priority>::toPair)
             .runningReduce { (_, accProb), (city, weight) -> city to (accProb + weight / totalWeight) }
             .let { seq ->
                 val random = rng.nextFloat()
-                seq.firstOrNull() { (_, cProb) -> random <= cProb }?.first
+                seq.firstOrNull() { (_, cProb) -> random <= cProb.value }?.first
             }?.also { nextPosition ->
                 position = nextPosition
-                return true
+                return ChoiceResult.MOVED
             }
 
-        return false
+        return ChoiceResult.STAYED
     }
 
     fun canReturnToStart(nextCities: Set<Int>): Boolean = startPosition in nextCities
 
-    fun cantReturnToStart(nextCities: Set<Int>): Boolean = !canReturnToStart(nextCities)
+    fun cannotReturnToStart(nextCities: Set<Int>): Boolean = !canReturnToStart(nextCities)
+
+    @JvmInline
+    value class ChoiceResult(private val value: Boolean) {
+        companion object {
+            val MOVED = ChoiceResult(true)
+            val STAYED = ChoiceResult(false)
+        }
+    }
 }
