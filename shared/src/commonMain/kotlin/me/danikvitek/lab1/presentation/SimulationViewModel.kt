@@ -6,6 +6,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.*
+import me.danikvitek.lab1.data.Plotter
+import me.danikvitek.lab1.data.getPlotter
 import me.danikvitek.lab1.domain.Simulation
 import me.danikvitek.lab1.domain.model.*
 import me.danikvitek.lab1.util.equalsElementWise
@@ -14,7 +16,7 @@ import kotlin.random.Random
 
 data class SimulationUIState(
     val cities: List<Offset> = emptyList(),
-    val roads: Map<Road, Pheromone> = emptyMap(),
+    val roads: Map<Road, Float> = emptyMap(),
     val age: Int = 0,
 ) {
     override fun equals(other: Any?): Boolean {
@@ -39,10 +41,11 @@ data class SimulationUIState(
     }
 }
 
-class SimulationViewModel() : ViewModel() {
+class SimulationViewModel(private val plotter: Plotter = getPlotter()) : ViewModel() {
     private var simulation: Simulation? = null
     val uiState: StateFlow<SimulationUIState>
         field = MutableStateFlow(SimulationUIState())
+    val plot = plotter::plot
 
     val bestRouteChannel: ReceiveChannel<CyclicRoute>
         field = Channel<CyclicRoute>()
@@ -62,6 +65,7 @@ class SimulationViewModel() : ViewModel() {
             preserveTopology: Boolean = false,
         ) {
             simulation?.cancel()
+            plotter.reset()
 
             val cityGraph =
                 if (preserveTopology && simulation != null)
@@ -70,14 +74,14 @@ class SimulationViewModel() : ViewModel() {
                             cities = it.cities,
                             roads = MutableRoads(
                                 it.roads.asSequence().associateTo(mutableMapOf()) { entry ->
-                                    entry.key to Pheromone(initialPheromoneLevel)
+                                    entry.key to initialPheromoneLevel
                                 },
                             ),
                         )
                     }
                 else
                     CityGraph.randomFullyConnected(
-                        initialPheromoneLevel = Pheromone(initialPheromoneLevel),
+                        initialPheromoneLevel = initialPheromoneLevel,
                         citiesAmount = citiesAmount,
                     )
             val weightingConfig = weightingConfig {
@@ -100,28 +104,31 @@ class SimulationViewModel() : ViewModel() {
                     age = it.currentAge,
                 )
             }
+
             bestRouteChannel.trySendBlocking(CyclicRoute())
         }
 
         suspend fun step(): SimulationStatus = simulation?.run {
             if (tick()) {
-                return@run SimulationStatus.Finished
+                plotter.recordIteration(bestLengthSoFar)
+                return@run SimulationStatus.FINISHED
             }
+            plotter.recordIteration(bestLengthSoFar)
             uiState.update {
                 it.copy(
                     age = currentAge,
                     roads = graph.roads,
                 )
             }
-            return@run SimulationStatus.Running
-        } ?: SimulationStatus.NotStarted
+            return@run SimulationStatus.RUNNING
+        } ?: SimulationStatus.NOT_STARTED
 
     }
 }
 
 enum class SimulationStatus {
-    Uninitialized,
-    NotStarted,
-    Running,
-    Finished,
+    UNINITIALIZED,
+    NOT_STARTED,
+    RUNNING,
+    FINISHED,
 }

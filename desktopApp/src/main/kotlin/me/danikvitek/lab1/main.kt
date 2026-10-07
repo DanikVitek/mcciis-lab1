@@ -6,7 +6,7 @@ import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.singleWindowApplication
 
 fun main() = singleWindowApplication(
-    state = WindowState(width = 800.dp, height = Dp.Unspecified),
+    state = WindowState(width = 1600.dp, height = Dp.Unspecified),
     title = "Lab 1 - Ant Colony",
 ) {
     App()

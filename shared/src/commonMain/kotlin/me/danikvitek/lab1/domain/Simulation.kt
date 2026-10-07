@@ -69,18 +69,17 @@ class Simulation(
                 if (first) entry.value else entry.value + acc!!
             }
 
-        graph.mutableRoads.replaceAll { road: Road, oldValue: Pheromone ->
-            Pheromone(
-                amount = weightingConfig.pheromoneEvaporationRate * oldValue.amount +
-                         weightingConfig.pheromoneDepositRate * pheromoneDeltas.getOrDefault(road, 0f),
-            )
+        graph.mutableRoads.replaceAll { road, oldValue ->
+            weightingConfig.pheromoneEvaporationRate * oldValue +
+            pheromoneDeltas.getOrDefault(road, 0f)
         }
     }
 
     var currentAge = 0
         private set
 
-    private var bestLengthSoFar = Float.POSITIVE_INFINITY
+    var bestLengthSoFar = Float.POSITIVE_INFINITY
+        private set
 
     private var coroutine: CoroutineScope? = null
     suspend fun cancel() {
@@ -109,29 +108,24 @@ class Simulation(
                             yield()
                         } while (!stuckOrFinished)
 
-                        val route = (ant.visited.asSequence() + ant.position).toList()
-                        var sum = 0f
-                        route.forEachIndexed { index, city ->
-                            val nextCity = route[(index + 1) % route.size]
-                            sum += (graph.cities[city] - graph.cities[nextCity]).getDistance()
-                        }
-                        sum to route
+                        ant.visited
+                            .toCollection(ArrayList(ant.visited.size + 1))
+                            .apply { add(ant.position) }
                     }
                 }
                 .treeFold(
                     initial = { Float.POSITIVE_INFINITY to null },
-                    aggregateItem = { acc: Pair<Float, List<Int>?>, item: Pair<Float, List<Int>>? ->
-                        if (item == null) {
-                            acc
-                        } else {
-                            val (bestLength) = acc
-                            val (length) = item
-                            if (length < bestLength) {
-                                item
-                            } else {
-                                acc
-                            }
+                    aggregateItem = { acc: Pair<Float, List<Int>?>, route: List<Int>? ->
+                        if (route == null) {
+                            return@treeFold acc
                         }
+
+                        var length = 0f
+                        route.forEachIndexed { index, city ->
+                            val nextCity = route[(index + 1) % route.size]
+                            length += (graph.cities[city] - graph.cities[nextCity]).getDistance()
+                        }
+                        length to route
                     },
                     aggregateAccumulators = { left: Pair<Float, List<Int>?>, right: Pair<Float, List<Int>?> ->
                         if (left.first < right.first) {
@@ -148,7 +142,7 @@ class Simulation(
 
             if (bestLengthInGeneration < bestLengthSoFar) {
                 bestLengthSoFar = bestLengthInGeneration
-                bestRouteChannel.send(CyclicRoute(bestRouteInGeneration!!))
+                bestRouteChannel.send(CyclicRoute(bestRouteInGeneration!!, bestLengthInGeneration))
             }
 
             updateJob.join()

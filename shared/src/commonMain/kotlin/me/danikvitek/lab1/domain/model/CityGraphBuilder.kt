@@ -2,7 +2,7 @@ package me.danikvitek.lab1.domain.model
 
 import androidx.compose.ui.geometry.Offset
 
-class CityGraphBuilder(val initialPheromoneLevel: Pheromone) {
+class CityGraphBuilder(val initialPheromoneLevel: Float) {
     val cities: List<Offset>
         field = mutableListOf<Offset>()
     val roads: Roads
@@ -13,7 +13,7 @@ class CityGraphBuilder(val initialPheromoneLevel: Pheromone) {
         return CityIndex(cities.lastIndex)
     }
 
-    fun twoWayRoad(city1: CityIndex, city2: CityIndex, pheromone: Pheromone = initialPheromoneLevel) =
+    fun road(city1: CityIndex, city2: CityIndex, pheromone: Float = initialPheromoneLevel) =
         roads.put(city1.value, city2.value, pheromone)
 
     internal fun build() = CityGraph(cities, roads)
@@ -26,5 +26,5 @@ value class CityIndex(val value: Int) {
     }
 }
 
-fun cityGraph(initialPheromoneLevel: Pheromone, init: CityGraphBuilder.() -> Unit) =
+fun cityGraph(initialPheromoneLevel: Float, init: CityGraphBuilder.() -> Unit) =
     CityGraphBuilder(initialPheromoneLevel).apply(init).build()

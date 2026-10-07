@@ -1,6 +1,7 @@
 package me.danikvitek.lab1
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -10,10 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PointMode
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -21,11 +19,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.runBlocking
+import me.danikvitek.lab1.data.PlotProvider
 import me.danikvitek.lab1.domain.model.CyclicRoute
 import me.danikvitek.lab1.presentation.SimulationStatus
 import me.danikvitek.lab1.presentation.SimulationUIState
 import me.danikvitek.lab1.presentation.SimulationViewModel
 import me.danikvitek.lab1.util.SafeSeededRandom
+import kotlin.math.ceil
 import kotlin.random.Random
 
 @Composable
@@ -45,13 +45,21 @@ fun AntColonyAppTheme(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+enum class CanvasOrPlot {
+    CANVAS, PLOT
+}
+
 @Composable
 fun AntColonyApp(
     viewModel: SimulationViewModel = viewModel { SimulationViewModel() },
 ) {
     val uiState = viewModel.uiState.collectAsState()
+    val plotProvider = derivedStateOf { viewModel.plot(uiState.value.cities.size) }
     val bestRoute = viewModel.bestRoute.collectAsState(initial = CyclicRoute())
+
+    val showPheromones = remember { mutableStateOf(true) }
+    val showBestRoute = remember { mutableStateOf(true) }
+    var canvasOrPlot by remember { mutableStateOf(CanvasOrPlot.CANVAS) }
 
     Row(
         modifier = Modifier
@@ -60,16 +68,48 @@ fun AntColonyApp(
             .safeDrawingPadding()
             .then(Modifier.padding(16.dp)),
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        MapCanvas(
-            modifier = Modifier
-                .fillMaxHeight()
-                .weight(1f, fill = true)
-                .border(1.dp, MaterialTheme.colorScheme.onBackground),
-            uiState = uiState,
-            bestRoute = bestRoute,
-        )
+        Column(
+            modifier = Modifier,
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(text = "Canvas")
+                Switch(
+                    checked = canvasOrPlot == CanvasOrPlot.PLOT,
+                    onCheckedChange = { canvasOrPlot = if (it) CanvasOrPlot.PLOT else CanvasOrPlot.CANVAS },
+                )
+                Text("Plot")
+            }
+            when (canvasOrPlot) {
+                CanvasOrPlot.CANVAS ->
+                    MapCanvas(
+                        modifier = Modifier
+//                .fillMaxHeight()
+                            .aspectRatio(1F)
+//                .weight(1f, fill = true)
+                            .border(1.dp, MaterialTheme.colorScheme.onBackground),
+                        uiState = uiState,
+                        bestRoute = bestRoute,
+                        showPheromones = showPheromones,
+                        showBestRoute = showBestRoute,
+                    )
+
+                CanvasOrPlot.PLOT ->
+                    Image(
+                        modifier = Modifier,
+                        bitmap = plotProvider.value.png
+                            .decodeToImageBitmap(),
+                        contentDescription = "Plot of the length of the shortest path found so far",
+                    )
+            }
+        }
+
         SimulationControls(
             modifier = Modifier
                 .fillMaxHeight()
@@ -77,6 +117,9 @@ fun AntColonyApp(
             uiState = uiState,
             bestRoute = bestRoute,
             simulationController = viewModel.SimulationController(),
+            showPheromones = showPheromones,
+            showBestRoute = showBestRoute,
+            plotProvider = plotProvider,
         )
     }
 }
@@ -86,12 +129,17 @@ fun MapCanvas(
     modifier: Modifier = Modifier,
     uiState: State<SimulationUIState>,
     bestRoute: State<CyclicRoute>,
+    showPheromones: State<Boolean>,
+    showBestRoute: State<Boolean>,
 ) {
     val uiState by uiState
     val bestRoute by bestRoute
 
     val textMeasurer = rememberTextMeasurer()
     val cityLabelStyle = MaterialTheme.typography.labelSmall
+
+    val showPheromones by showPheromones
+    val showBestRoute by showBestRoute
     Canvas(
         modifier = modifier,
         contentDescription = "Ant colony simulation",
@@ -104,23 +152,51 @@ fun MapCanvas(
             y = this.y * (size.height - 2 * imgPadding) + imgPadding,
         )
 
-        for ((road, level) in uiState.roads) {
-            val intensity = level.amount.coerceIn(0f, 1f)
-            drawLine(
-                color = lerp(Color.Blue.copy(alpha = 0f), Color.Red, intensity),
-                start = uiState.cities[road.city1].toCanvasPos(),
-                end = uiState.cities[road.city2].toCanvasPos(),
-                strokeWidth = (intensity * 4.dp.toPx()).coerceAtLeast(1.dp.toPx()),
-            )
+        if (showPheromones) {
+            val maxLevel = uiState.roads.maxOfOrNull { it.value }
+            for ((road, level) in uiState.roads) {
+                val intensity = level / maxLevel!!
+
+                val lineStart = uiState.cities[road.city1].toCanvasPos()
+                val lineEnd = uiState.cities[road.city2].toCanvasPos()
+
+                val lineMid = (lineStart + lineEnd) / 2f;
+                val lineNormal = (lineEnd - lineStart).let { it / it.getDistance() }.let { Offset(-it.y, it.x) }
+
+                val brushWidth = (intensity * 10.dp.toPx()).coerceAtLeast(1.dp.toPx())
+                val brushStart = lineMid - lineNormal * brushWidth
+                val brushEnd = lineMid + lineNormal * brushWidth
+
+                drawLine(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.0625f), intensity),
+                            lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.25f), intensity),
+                            lerp(Color.Blue.copy(alpha = 0f), Color.Red, intensity),
+                            lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.25f), intensity),
+                            lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.0625f), intensity),
+                            Color.Transparent,
+                        ),
+                        start = brushStart,
+                        end = brushEnd,
+                    ),
+                    start = lineStart,
+                    end = lineEnd,
+                    strokeWidth = brushWidth,
+                )
+            }
         }
 
-        bestRoute.cities.takeUnless { it.isEmpty() }?.forEachIndexed { idx, it ->
-            drawLine(
-                color = Color.Green,
-                start = uiState.cities[it].toCanvasPos(),
-                end = uiState.cities[bestRoute.cities[(idx + 1) % bestRoute.size]].toCanvasPos(),
-                strokeWidth = 2.dp.toPx(),
-            )
+        if (showBestRoute) {
+            bestRoute.cities.takeUnless { it.isEmpty() }?.forEachIndexed { idx, it ->
+                drawLine(
+                    color = Color.Green,
+                    start = uiState.cities[it].toCanvasPos(),
+                    end = uiState.cities[bestRoute.cities[(idx + 1) % bestRoute.size]].toCanvasPos(),
+                    strokeWidth = 2.dp.toPx(),
+                )
+            }
         }
 
         drawPoints(
@@ -154,16 +230,22 @@ fun SimulationControls(
     uiState: State<SimulationUIState>,
     bestRoute: State<CyclicRoute>,
     simulationController: SimulationViewModel.SimulationController,
+    showPheromones: MutableState<Boolean>,
+    showBestRoute: MutableState<Boolean>,
+    plotProvider: State<PlotProvider>,
 ) {
     val uiState by uiState
     val bestRoute by bestRoute
-    var simStatus by remember { mutableStateOf(SimulationStatus.Uninitialized) }
+    var simStatus by remember { mutableStateOf(SimulationStatus.UNINITIALIZED) }
+    var showPheromones by showPheromones
+    var showBestRoute by showBestRoute
 
     LaunchedEffect(simStatus) {
-        if (simStatus == SimulationStatus.Running)
-            while (simulationController.step() == SimulationStatus.Running) {
-//                delay(50.milliseconds)
-            }
+        if (simStatus == SimulationStatus.RUNNING) {
+            do {
+                val result = simulationController.step()
+            } while (result == SimulationStatus.RUNNING)
+        }
     }
 
     Column(
@@ -205,6 +287,23 @@ fun SimulationControls(
             supportingText = {
                 if (citiesAmountString.isNotEmpty() && (citiesAmount == null || citiesAmount !in MIN_CITIES_AMOUNT..MAX_CITIES_AMOUNT)) {
                     Text("Must be a number between $MIN_CITIES_AMOUNT and $MAX_CITIES_AMOUNT")
+                }
+            },
+        )
+
+        var antsPercentString by remember { mutableStateOf("100") }
+        val antsPercent by derivedStateOf { antsPercentString.toFloatOrNull() }
+        TextField(
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("% of ants per cities amount") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            value = antsPercentString,
+            onValueChange = { antsPercentString = it },
+            isError = antsPercentString.isNotEmpty() && antsPercent.let { it == null || it <= 0 },
+            supportingText = {
+                if (antsPercentString.isNotEmpty() && antsPercent.let { it == null || it <= 0 }) {
+                    Text("Must be a positive number")
                 }
             },
         )
@@ -301,6 +400,23 @@ fun SimulationControls(
             },
         )
 
+        var initialPheromoneLevelString by remember { mutableStateOf("0.01") }
+        val initialPheromoneLevel by derivedStateOf { initialPheromoneLevelString.toFloatOrNull() }
+        TextField(
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Pheromone deposit multiplier (Q)") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            value = initialPheromoneLevelString,
+            onValueChange = { initialPheromoneLevelString = it },
+            isError = initialPheromoneLevelString.isNotEmpty() && initialPheromoneLevel.let { (it == null || it <= 0) },
+            supportingText = {
+                if (initialPheromoneLevelString.isNotEmpty() && initialPheromoneLevel.let { (it == null || it <= 0) }) {
+                    Text("Must be a positive number")
+                }
+            },
+        )
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -310,6 +426,10 @@ fun SimulationControls(
                 onClick = {
                     val citiesAmountLocal = citiesAmount
                     if (citiesAmountLocal == null || citiesAmountLocal !in MIN_CITIES_AMOUNT..MAX_CITIES_AMOUNT) return@Button
+
+                    val antsPercentLocal = antsPercent
+                    if (antsPercentLocal == null || antsPercentLocal <= 0) return@Button
+                    val antsAmount = ceil(citiesAmountLocal * (antsPercentLocal / 100)).toInt()
 
                     val agesLocal = ages
                     if (agesLocal == null || agesLocal <= 0) return@Button
@@ -323,52 +443,72 @@ fun SimulationControls(
                     val pheromoneDepositMultiplierLocal = pheromoneDepositMultiplier
                     if (pheromoneDepositMultiplierLocal == null || pheromoneDepositMultiplierLocal <= 0) return@Button
 
+                    val initialPheromoneLevelLocal = initialPheromoneLevel
+                    if (initialPheromoneLevelLocal == null || initialPheromoneLevelLocal <= 0) return@Button
+
                     runBlocking {
                         context(rng) {
                             simulationController.reset(
                                 citiesAmount = citiesAmountLocal,
-                                antsAmount = citiesAmountLocal,
+                                antsAmount = antsAmount,
                                 ages = agesLocal,
                                 distanceImportance = distanceImportanceLocal,
                                 pheromoneImportance = pheromoneImportanceLocal,
                                 pheromoneDepositMultiplier = pheromoneDepositMultiplierLocal,
-                                preserveTopology = simStatus == SimulationStatus.Running || simStatus == SimulationStatus.Finished,
+                                initialPheromoneLevel = initialPheromoneLevelLocal,
+                                preserveTopology = simStatus == SimulationStatus.RUNNING || simStatus == SimulationStatus.FINISHED,
                             )
                         }
-                        simStatus = SimulationStatus.NotStarted
+                        simStatus = SimulationStatus.NOT_STARTED
                     }
                 },
             ) {
                 Text(
-                    text = if (simStatus == SimulationStatus.Uninitialized) "Init" else "Reset",
+                    text = if (simStatus == SimulationStatus.UNINITIALIZED) "Init" else "Reset",
                 )
             }
             Button(
-                enabled = simStatus == SimulationStatus.NotStarted,
-                onClick = { simStatus = SimulationStatus.Running },
+                enabled = simStatus == SimulationStatus.NOT_STARTED,
+                onClick = { simStatus = SimulationStatus.RUNNING },
             ) {
                 Text(
-                    text = if (simStatus == SimulationStatus.Running) (uiState.age + 1).toString() else "Run",
+                    text = if (simStatus == SimulationStatus.RUNNING) (uiState.age + 1).toString() else "Run",
                 )
             }
         }
 
         Column {
-            val bestRouteLength by derivedStateOf {
-                if (bestRoute.cities.isEmpty())
-                    Float.POSITIVE_INFINITY
-                else
-                    bestRoute.cities.foldIndexed(0f) { index, acc, city ->
-                        val nextCity = bestRoute.cities[(index + 1) % bestRoute.size]
-                        acc + (uiState.cities[city] - uiState.cities[nextCity]).getDistance()
-                    }
-            }
             Text(
                 text = "Shortest route length so far:",
             )
             Text(
-                text = bestRouteLength.toString(),
+                text = bestRoute.length.toString(),
             )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Checkbox(
+                checked = showPheromones,
+                onCheckedChange = { showPheromones = it },
+            )
+            Text(text = "Show pheromones")
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Checkbox(
+                checked = showBestRoute,
+                onCheckedChange = { showBestRoute = it },
+            )
+            Text(text = "Show best route")
+        }
+        Button(
+            onClick = plotProvider.value::save,
+        ) {
+            Text(text = "Save plot")
         }
     }
 }

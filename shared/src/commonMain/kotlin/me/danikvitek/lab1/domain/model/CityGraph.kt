@@ -1,8 +1,9 @@
 package me.danikvitek.lab1.domain.model
 
 import androidx.compose.ui.geometry.Offset
+import kotlinx.collections.immutable.PersistentMap
+import kotlinx.collections.immutable.mutate
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentNavigableMap
 import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.sin
@@ -38,7 +39,7 @@ class CityGraph private constructor(
     }
 
     companion object {
-        fun fullyConnected(initialPheromoneLevel: Pheromone, cities: List<Offset>): CityGraph {
+        fun fullyConnected(initialPheromoneLevel: Float, cities: List<Offset>): CityGraph {
             val roads = MutableRoads().apply {
                 for (i in cities.indices) {
                     for (j in i + 1..cities.lastIndex) {
@@ -50,7 +51,7 @@ class CityGraph private constructor(
         }
 
         context(rng: Random)
-        fun randomFullyConnected(initialPheromoneLevel: Pheromone, citiesAmount: Int) = fullyConnected(
+        fun randomFullyConnected(initialPheromoneLevel: Float, citiesAmount: Int) = fullyConnected(
             initialPheromoneLevel,
             cities = run {
                 val initialPositions = (0..<citiesAmount).map {
@@ -72,7 +73,7 @@ class CityGraph private constructor(
             },
         )
 
-        fun ringFullyConnected(initialPheromoneLevel: Pheromone, citiesAmount: Int) = fullyConnected(
+        fun ringFullyConnected(initialPheromoneLevel: Float, citiesAmount: Int) = fullyConnected(
             initialPheromoneLevel,
             cities = run {
                 val angle = 2 * Math.PI / citiesAmount
@@ -89,26 +90,21 @@ class CityGraph private constructor(
     internal val mutableRoads: MutableRoads = roads
     val roads: Roads by this::mutableRoads
 
-    private val distancesCache = ConcurrentHashMap<Road, Float>()
+    private val invDistancesCache = ConcurrentHashMap<Road, Float>(roads.size)
 
     context(weighting: WeightingConfig)
-    fun accessibleCities(from: Int): Map<Int, Priority> {
-        val nextCities: Map<Int, Pheromone> = roads.accessibleCities(from)
+    fun accessibleCities(from: Int): PersistentMap<Int, Float> {
+        val nextCities: PersistentMap<Int, Float> = roads.accessibleCities(from)
         val fromPosition: Offset = cities[from]
-        return nextCities.asSequence().associateBy(
-            keySelector = { (cityIdx, _) -> cityIdx },
-            valueTransform = { (to, pheromone) ->
-                val distanceWeight =
-                    1f / distancesCache.getOrPut(Road(from, to)) {
-                        (fromPosition - cities[to]).getDistance()
-                    }
-                val pheromoneWeight = pheromone.amount
+        return nextCities.mutate {
+            it.replaceAll { to, pheromone ->
+                val distanceWeight = invDistancesCache.getOrPut(Road(from, to)) {
+                    1f / (fromPosition - cities[to]).getDistance()
+                }
 
-                Priority(
-                    pheromoneWeight.pow(weighting.alpha) *
-                    distanceWeight.pow(weighting.beta),
-                )
-            },
-        )
+                pheromone.pow(weighting.alpha) *
+                distanceWeight.pow(weighting.beta)
+            }
+        }
     }
 }

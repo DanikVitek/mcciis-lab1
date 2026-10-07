@@ -18,12 +18,9 @@ suspend fun <T, R> List<Deferred<T>>.treeFold(
 ): R {
     return when (size) {
         0 -> initial()
-        1 -> aggregateAccumulators(
+        1 -> aggregateItem(
             initial(),
-            aggregateItem(
-                initial(),
-                this[0].await(),
-            ),
+            this[0].await(),
         )
 
         else -> {
