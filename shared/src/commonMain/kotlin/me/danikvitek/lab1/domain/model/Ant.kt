@@ -9,6 +9,7 @@ class Ant(
      * The current position of the ant in the list of cities.
      */
     val startPosition: Int,
+    val elite: Boolean = false,
 ) {
     /**
      * The current position of the ant in the list of cities.

@@ -274,147 +274,53 @@ fun SimulationControls(
             },
         )
 
-        var citiesAmountString by remember { mutableStateOf("10") }
-        val citiesAmount by derivedStateOf { citiesAmountString.toIntOrNull() }
-        TextField(
+        val citiesAmount = rememberIntFieldState("10", Constraint.RangeInt(MIN_CITIES_AMOUNT..MAX_CITIES_AMOUNT))
+        ValidatedField(
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Number of cities") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            value = citiesAmountString,
-            onValueChange = { citiesAmountString = it },
-            isError = citiesAmountString.isNotEmpty() && (citiesAmount == null || citiesAmount !in MIN_CITIES_AMOUNT..MAX_CITIES_AMOUNT),
-            supportingText = {
-                if (citiesAmountString.isNotEmpty() && (citiesAmount == null || citiesAmount !in MIN_CITIES_AMOUNT..MAX_CITIES_AMOUNT)) {
-                    Text("Must be a number between $MIN_CITIES_AMOUNT and $MAX_CITIES_AMOUNT")
-                }
-            },
+            state = citiesAmount,
+            label = "Number of cities",
         )
 
-        var antsPercentString by remember { mutableStateOf("100") }
-        val antsPercent by derivedStateOf { antsPercentString.toFloatOrNull() }
-        TextField(
+        val antsPercent = rememberFloatFieldState("100", Constraint.PositiveFloat)
+        ValidatedField(
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("% of ants per cities amount") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            value = antsPercentString,
-            onValueChange = { antsPercentString = it },
-            isError = antsPercentString.isNotEmpty() && antsPercent.let { it == null || it <= 0 },
-            supportingText = {
-                if (antsPercentString.isNotEmpty() && antsPercent.let { it == null || it <= 0 }) {
-                    Text("Must be a positive number")
-                }
-            },
+            state = antsPercent,
+            label = "% of ants per cities amount",
         )
 
-        var agesString by remember { mutableStateOf("50") }
-        val ages by derivedStateOf { agesString.toIntOrNull() }
-        TextField(
+        val ages = rememberIntFieldState("50", Constraint.PositiveInt)
+        ValidatedField(
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Number of ages") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            value = agesString,
-            onValueChange = { agesString = it },
-            isError = agesString.isNotEmpty() && run {
-                val agesLocal = ages
-                (agesLocal == null || agesLocal <= 0)
-            },
-            supportingText = {
-                if (agesString.isNotEmpty()) {
-                    val agesLocal = ages
-                    if (agesLocal == null || agesLocal <= 0) {
-                        Text("Must be a positive number")
-                    }
-                }
-            },
+            state = ages,
+            label = "Number of ages",
         )
 
-        var distanceImportanceString by remember { mutableStateOf("1") }
-        val distanceImportance by derivedStateOf { distanceImportanceString.toFloatOrNull() }
-        TextField(
+        val distanceImportance = rememberFloatFieldState("1", Constraint.NonNegativeFloat)
+        ValidatedField(
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Distance importance (alpha)") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            value = distanceImportanceString,
-            onValueChange = { distanceImportanceString = it },
-            isError = distanceImportanceString.isNotEmpty() && run {
-                val distanceImportanceLocal = distanceImportance
-                (distanceImportanceLocal == null || distanceImportanceLocal < 0)
-            },
-            supportingText = {
-                if (distanceImportanceString.isNotEmpty()) {
-                    val distanceImportanceLocal = distanceImportance
-                    if (distanceImportanceLocal == null || distanceImportanceLocal < 0) {
-                        Text("Must be a non-negative number")
-                    }
-                }
-            },
+            state = distanceImportance,
+            label = "Distance importance (alpha)",
         )
 
-        var pheromoneImportanceString by remember { mutableStateOf("3") }
-        val pheromoneImportance by derivedStateOf { pheromoneImportanceString.toFloatOrNull() }
-        TextField(
+        val pheromoneImportance = rememberFloatFieldState("3", Constraint.NonNegativeFloat)
+        ValidatedField(
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Pheromone importance (beta)") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            value = pheromoneImportanceString,
-            onValueChange = { pheromoneImportanceString = it },
-            isError = pheromoneImportanceString.isNotEmpty() && run {
-                val pheromoneImportanceLocal = pheromoneImportance
-                (pheromoneImportanceLocal == null || pheromoneImportanceLocal < 0)
-            },
-            supportingText = {
-                if (pheromoneImportanceString.isNotEmpty()) {
-                    val pheromoneImportanceLocal = pheromoneImportance
-                    if (pheromoneImportanceLocal == null || pheromoneImportanceLocal < 0) {
-                        Text("Must be a non-negative number")
-                    }
-                }
-            },
+            state = pheromoneImportance,
+            label = "Pheromone importance (beta)",
         )
 
-        var pheromoneDepositMultiplierString by remember { mutableStateOf("1") }
-        val pheromoneDepositMultiplier by derivedStateOf { pheromoneDepositMultiplierString.toFloatOrNull() }
-        TextField(
+        val pheromoneDepositMultiplier = rememberFloatFieldState("1", Constraint.PositiveFloat)
+        ValidatedField(
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Pheromone deposit multiplier (Q)") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            value = pheromoneDepositMultiplierString,
-            onValueChange = { pheromoneDepositMultiplierString = it },
-            isError = pheromoneDepositMultiplierString.isNotEmpty() && run {
-                val pheromoneDepositMultiplierLocal = pheromoneDepositMultiplier
-                (pheromoneDepositMultiplierLocal == null || pheromoneDepositMultiplierLocal <= 0)
-            },
-            supportingText = {
-                if (pheromoneDepositMultiplierString.isNotEmpty()) {
-                    val pheromoneDepositMultiplierLocal = pheromoneDepositMultiplier
-                    if (pheromoneDepositMultiplierLocal == null || pheromoneDepositMultiplierLocal <= 0) {
-                        Text("Must be a positive number")
-                    }
-                }
-            },
+            state = pheromoneDepositMultiplier,
+            label = "Pheromone deposit multiplier (Q)",
         )
 
-        var initialPheromoneLevelString by remember { mutableStateOf("0.01") }
-        val initialPheromoneLevel by derivedStateOf { initialPheromoneLevelString.toFloatOrNull() }
-        TextField(
+        val initialPheromoneLevel = rememberFloatFieldState("0.01", Constraint.PositiveFloat)
+        ValidatedField(
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Pheromone deposit multiplier (Q)") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            value = initialPheromoneLevelString,
-            onValueChange = { initialPheromoneLevelString = it },
-            isError = initialPheromoneLevelString.isNotEmpty() && initialPheromoneLevel.let { (it == null || it <= 0) },
-            supportingText = {
-                if (initialPheromoneLevelString.isNotEmpty() && initialPheromoneLevel.let { (it == null || it <= 0) }) {
-                    Text("Must be a positive number")
-                }
-            },
+            state = initialPheromoneLevel,
+            label = "Initial pheromone level",
         )
 
         Row(
@@ -424,38 +330,27 @@ fun SimulationControls(
         ) {
             Button(
                 onClick = {
-                    val citiesAmountLocal = citiesAmount
-                    if (citiesAmountLocal == null || citiesAmountLocal !in MIN_CITIES_AMOUNT..MAX_CITIES_AMOUNT) return@Button
-
-                    val antsPercentLocal = antsPercent
-                    if (antsPercentLocal == null || antsPercentLocal <= 0) return@Button
-                    val antsAmount = ceil(citiesAmountLocal * (antsPercentLocal / 100)).toInt()
-
-                    val agesLocal = ages
-                    if (agesLocal == null || agesLocal <= 0) return@Button
-
-                    val pheromoneImportanceLocal = pheromoneImportance
-                    if (pheromoneImportanceLocal == null || pheromoneImportanceLocal < 0) return@Button
-
-                    val distanceImportanceLocal = distanceImportance
-                    if (distanceImportanceLocal == null || distanceImportanceLocal < 0) return@Button
-
-                    val pheromoneDepositMultiplierLocal = pheromoneDepositMultiplier
-                    if (pheromoneDepositMultiplierLocal == null || pheromoneDepositMultiplierLocal <= 0) return@Button
-
-                    val initialPheromoneLevelLocal = initialPheromoneLevel
-                    if (initialPheromoneLevelLocal == null || initialPheromoneLevelLocal <= 0) return@Button
+                    val citiesAmount = citiesAmount.value ?: return@Button
+                    val antsAmount = run {
+                        val antsPercent = antsPercent.value ?: return@Button
+                        ceil(citiesAmount * (antsPercent / 100)).toInt()
+                    }
+                    val agesLocal = ages.value ?: return@Button
+                    val distanceImportance = distanceImportance.value ?: return@Button
+                    val pheromoneImportance = pheromoneImportance.value ?: return@Button
+                    val pheromoneDepositMultiplier = pheromoneDepositMultiplier.value ?: return@Button
+                    val initialPheromoneLevel = initialPheromoneLevel.value ?: return@Button
 
                     runBlocking {
                         context(rng) {
                             simulationController.reset(
-                                citiesAmount = citiesAmountLocal,
+                                citiesAmount = citiesAmount,
                                 antsAmount = antsAmount,
                                 ages = agesLocal,
-                                distanceImportance = distanceImportanceLocal,
-                                pheromoneImportance = pheromoneImportanceLocal,
-                                pheromoneDepositMultiplier = pheromoneDepositMultiplierLocal,
-                                initialPheromoneLevel = initialPheromoneLevelLocal,
+                                distanceImportance = distanceImportance,
+                                pheromoneImportance = pheromoneImportance,
+                                pheromoneDepositMultiplier = pheromoneDepositMultiplier,
+                                initialPheromoneLevel = initialPheromoneLevel,
                                 preserveTopology = simStatus == SimulationStatus.RUNNING || simStatus == SimulationStatus.FINISHED,
                             )
                         }
@@ -512,3 +407,91 @@ fun SimulationControls(
         }
     }
 }
+
+abstract class FieldState<T : Any>(
+    initialValue: String,
+    internal val constraint: Constraint<T>,
+    conversion: (String) -> T?,
+) {
+    var text by mutableStateOf(initialValue)
+        internal set
+
+    val value: T? by derivedStateOf { conversion(text).takeIf(constraint::check) }
+}
+
+class FloatFieldState(initialValue: String, constraint: Constraint<Float>) : FieldState<Float>(
+    initialValue, constraint,
+    String::toFloatOrNull,
+)
+
+class IntFieldState(initialValue: String, constraint: Constraint<Int>) : FieldState<Int>(
+    initialValue, constraint,
+    String::toIntOrNull,
+)
+
+@Composable
+fun rememberIntFieldState(initialValue: String, constraint: Constraint<Int>) =
+    remember { IntFieldState(initialValue, constraint) }
+
+@Composable
+fun rememberFloatFieldState(initialValue: String, constraint: Constraint<Float>) =
+    remember { FloatFieldState(initialValue, constraint) }
+
+@Composable
+fun <T : Any> ValidatedField(
+    modifier: Modifier,
+    state: FieldState<T>,
+    label: String,
+) {
+    TextField(
+        modifier = modifier,
+        label = { Text(label) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = state.constraint.keyboardType),
+        value = state.text,
+        onValueChange = { state.text = it },
+        isError = state.value == null,
+        supportingText = {
+            if (state.value == null) {
+                Text(state.constraint.message)
+            }
+        },
+    )
+}
+
+interface Constraint<T> {
+    fun check(value: T?): Boolean
+    val message: String
+    val keyboardType: KeyboardType
+
+    object PositiveInt : Constraint<Int> {
+        override fun check(value: Int?) = value.let { it != null && it > 0 }
+        override val message = "Must be a positive integer"
+        override val keyboardType = KeyboardType.Number
+    }
+
+    object NonNegativeInt : Constraint<Int> {
+        override fun check(value: Int?) = value.let { it != null && it >= 0 }
+        override val message = "Must be a non-negative integer"
+        override val keyboardType = KeyboardType.Number
+    }
+
+    data class RangeInt(private val range: IntRange) : Constraint<Int> {
+        override fun check(value: Int?) = value.let { it != null && it in range }
+        override val message by lazy { "Must be an integer in range $range" }
+        override val keyboardType = KeyboardType.Number
+    }
+
+    object PositiveFloat : Constraint<Float> {
+        override fun check(value: Float?) = value.let { it != null && it > 0 }
+        override val message = "Must be a positive FP number"
+        override val keyboardType = KeyboardType.Decimal
+    }
+
+    object NonNegativeFloat : Constraint<Float> {
+        override fun check(value: Float?) = value.let { it != null && it >= 0 }
+        override val message = "Must be a non-negative FP number"
+        override val keyboardType = KeyboardType.Decimal
+    }
+}
+
