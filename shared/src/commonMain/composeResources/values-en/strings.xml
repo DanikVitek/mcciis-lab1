@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<resources>
+    <!-- Window & App Navigation -->
+    <string name="window_title">Lab 1 — Ant Colony</string>
+    <string name="app_title">ACO Route Optimization System</string>
+    <string name="nav_task_solver">Intellectual Information System (Graph Builder &amp; Task Solver)</string>
+    <string name="nav_experiment_runner">Experiment Runner (Random Graph Simulation)</string>
+
+    <!-- Common Tabs & Units -->
+    <string name="tab_graph">Graph</string>
+    <string name="tab_plot">Plot</string>
+    <string name="unit_km">km</string>
+    <string name="dropdown_none">None</string>
+
+    <!-- Map Management Bar -->
+    <string name="map_name_label">Map Name</string>
+    <string name="load_preset_button">Load Preset ▾</string>
+    <string name="preset_item_format">%1$s (%2$d cities)</string>
+    <string name="save_map_and_solution">Save Map &amp; Solution</string>
+    <string name="load_map_file">Load Map File</string>
+    <string name="clear_map">Clear Map</string>
+    <string name="default_new_map_name">New Custom Map</string>
+    <string name="default_city_name">City %1$d</string>
+
+    <!-- Canvas Toolbar & Tools -->
+    <string name="tool_label">Tool:</string>
+    <string name="tool_select_move">Select / Move</string>
+    <string name="tool_add_city">Add City</string>
+    <string name="tool_connect_road">Connect Road</string>
+    <string name="tool_delete">Delete</string>
+    <string name="adjust_layout_now">Adjust Layout Now</string>
+
+    <string name="hint_select_move">Hint: Drag any city on the canvas to reposition it, or click a city to select it.</string>
+    <string name="hint_add_city">Hint: Click anywhere on empty canvas space to place a new city.</string>
+    <string name="hint_connect_road_selected">Hint: Selected &quot;%1$s&quot; — now click another city on the canvas to connect them.</string>
+    <string name="hint_connect_road_unselected">Hint: Click the first city on the canvas, then click a second city to create a road.</string>
+    <string name="hint_delete">Hint: Click any city node or road segment on the canvas to delete it.</string>
+
+    <string name="auto_adjust_positions">Auto-adjust positions to km</string>
+    <string name="show_road_km">Road km</string>
+    <string name="show_pheromones_short">Pheromones</string>
+    <string name="show_best_route_short">Best route</string>
+
+    <!-- Plot & Right Panel Tabs -->
+    <string name="convergence_plot_desc">Convergence Plot</string>
+    <string name="plot_placeholder">Run the solver for at least 1 age to generate the convergence plot.</string>
+    <string name="tab_graph_builder">1. Graph Builder (%1$d cities, %2$d roads)</string>
+    <string name="tab_task_solver">2. Task Solver &amp; Route%1$s</string>
+    <string name="tab_task_solver_badge"> • %1$s km</string>
+
+    <!-- Validation Banner -->
+    <string name="validation_title">Graph Constraints &amp; Validation Issues</string>
+    <string name="validation_min_cities">• Add at least 2 cities to run the Ant Colony solver.</string>
+    <string name="validation_disconnected">• The city graph is disconnected. Connect all components with roads.</string>
+    <string name="validation_low_degree">• Each city needs at least %1$d road(s) for a cyclic tour. Check: %2$s</string>
+    <string name="validation_triangle_header">• Triangle inequality violated on %1$d triangle(s):</string>
+    <string name="validation_triangle_item">   %1$s ↔ %2$s (%3$s km) &gt; %1$s → %4$s → %2$s (%5$s km)</string>
+    <string name="validation_triangle_more">   ...and %1$d more.</string>
+    <string name="btn_connect_all_cities">Connect All Cities</string>
+    <string name="btn_auto_clamp_roads">Auto-Clamp Violating Roads</string>
+    <string name="btn_sync_km_from_canvas">Sync km from Canvas</string>
+
+    <!-- Graph Builder Panel -->
+    <string name="cities_header">Cities (%1$d)</string>
+    <string name="new_city_name_label">New city name</string>
+    <string name="btn_add">Add</string>
+    <string name="start_city_number_label">Start City #%1$d</string>
+    <string name="city_number_label">City #%1$d</string>
+    <string name="roads_header">Roads (%1$d)</string>
+    <string name="btn_connect_all">Connect All</string>
+    <string name="btn_canvas_to_km">Canvas → km</string>
+    <string name="road_from_label">From</string>
+    <string name="road_to_label">To</string>
+    <string name="road_length_km_label">Length (km)</string>
+    <string name="btn_set_road">Set Road</string>
+    <string name="btn_set">Set</string>
+
+    <!-- Solver & Results Panel -->
+    <string name="solver_card_title">Ant Colony Task Solver</string>
+    <string name="start_depot_city_label">Start / Depot City</string>
+    <string name="warm_start_title">Previous Best Route Saved (%1$s km)</string>
+    <string name="warm_start_subtitle">Rerunning the simulation will warm-start from this route.</string>
+    <string name="btn_clear_solution">Clear Solution</string>
+    <string name="btn_rerun_solver_warm_start">Rerun Solver (Warm-Start)</string>
+    <string name="btn_solve_optimal_route">Solve Optimal Route</string>
+    <string name="btn_pause">Pause</string>
+    <string name="btn_init_reset">Init / Reset</string>
+    <string name="btn_step_age">Step (Age %1$d)</string>
+    <string name="btn_save_plot">Save Plot</string>
+    <string name="auto_scale_q_label">Auto-scale Q to km road distances</string>
+    <string name="btn_hide_aco_params">Hide ACO Params ▲</string>
+    <string name="btn_show_aco_params">ACO Params ▼</string>
+
+    <string name="param_ages">Number of ages</string>
+    <string name="param_ants_per_city">% of ants per city</string>
+    <string name="param_elite_ants">% of elite ants</string>
+    <string name="param_rng_seed_optional">RNG Seed (optional)</string>
+    <string name="param_pheromone_weight">Pheromone weight (α)</string>
+    <string name="param_visibility_weight">Visibility weight (β)</string>
+    <string name="param_evaporation_rate">Evaporation rate (ρ)</string>
+    <string name="param_initial_pheromone">Initial pheromone</string>
+    <string name="param_deposit_multiplier">Deposit multiplier (Q)</string>
+
+    <string name="optimal_tour_title">Optimal Tour Solution</string>
+    <string name="total_km_badge">Total: %1$s km</string>
+    <string name="no_route_computed_yet">No route computed yet. Click &quot;Solve Optimal Route&quot; above to find the shortest cyclic tour visiting all cities.</string>
+
+    <!-- Status Messages -->
+    <string name="status_loaded_preset">Loaded preset: %1$s</string>
+    <string name="status_adjusted_positions">Adjusted city positions according to road distances.</string>
+    <string name="status_added_city">Added city &quot;%1$s&quot;.</string>
+    <string name="status_removed_city">Removed city &quot;%1$s&quot;.</string>
+    <string name="status_set_road">Set road %1$s ↔ %2$s to %3$s km.</string>
+    <string name="status_road_already_exists">Road between %1$s and %2$s already exists (%3$s km).</string>
+    <string name="status_removed_road">Removed road %1$s ↔ %2$s.</string>
+    <string name="status_connected_missing_roads">Connected %1$d missing road(s) using canvas distances.</string>
+    <string name="status_all_pairs_connected">All city pairs are already connected.</string>
+    <string name="status_clamped_triangle">Clamped violating road lengths to satisfy the triangle inequality.</string>
+    <string name="status_recalculated_from_canvas">Recalculated road lengths from current canvas positions.</string>
+    <string name="status_cleared_map">Cleared map.</string>
+    <string name="status_cleared_solution">Cleared saved route solution. Next run will start from scratch.</string>
+    <string name="status_saved_map">Saved map &amp; solution to %1$s</string>
+    <string name="status_loaded_file_with_route">Loaded &quot;%1$s&quot; with saved best route (%2$s km).</string>
+    <string name="status_loaded_file">Loaded &quot;%1$s&quot;.</string>
+    <string name="status_cannot_start_invalid">Cannot start solver: please fix graph validation errors first.</string>
+    <string name="status_init_warm_start">Initialized solver warm-started from previous best route (%1$s km).</string>
+    <string name="status_init_solver">Initialized solver (%1$d ants, %2$d ages).</string>
+    <string name="status_finished_optimal">Finished! Optimal route length: %1$s km.</string>
+    <string name="status_finished_no_cycle">Finished, but ants could not find a complete Hamiltonian cycle on this graph.</string>
+
+    <!-- Experiment Runner Screen -->
+    <string name="exp_plot_desc">Plot of the length of the shortest path found so far</string>
+    <string name="exp_canvas_desc">Ant colony simulation</string>
+    <string name="param_rng_seed">RNG seed</string>
+    <string name="param_rng_seed_blank_hint">Blank seed will use a system’s entropy</string>
+    <string name="param_cities_amount">Number of cities</string>
+    <string name="param_ants_percent">% of ants per cities amount</string>
+    <string name="param_elite_ants_all">% of elite ants among all ants</string>
+    <string name="param_distance_importance">Distance importance (alpha)</string>
+    <string name="param_pheromone_importance">Pheromone importance (beta)</string>
+    <string name="param_deposit_multiplier_q">Pheromone deposit multiplier (Q)</string>
+    <string name="param_initial_pheromone_level">Initial pheromone level</string>
+    <string name="btn_init">Init</string>
+    <string name="btn_reset">Reset</string>
+    <string name="btn_run">Run</string>
+    <string name="shortest_route_so_far">Shortest route length so far:</string>
+    <string name="show_pheromones">Show pheromones</string>
+    <string name="show_best_route">Show best route</string>
+
+    <!-- Field Validation Constraints -->
+    <string name="err_positive_int">Must be a positive integer</string>
+    <string name="err_non_negative_int">Must be a non-negative integer</string>
+    <string name="err_range_int">Must be an integer in range %1$s</string>
+    <string name="err_positive_float">Must be a positive FP number</string>
+    <string name="err_non_negative_float">Must be a non-negative FP number</string>
+    <string name="err_range_float">Must be an FP number in range %1$s</string>
+</resources>

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
+import lab1.shared.generated.resources.*
 import me.danikvitek.lab1.CanvasOrPlot
 import me.danikvitek.lab1.data.MapPresets
 import me.danikvitek.lab1.domain.model.CyclicRoute
@@ -43,6 +44,8 @@ import me.danikvitek.lab1.presentation.fieldState.ValidatedField
 import me.danikvitek.lab1.presentation.fieldState.rememberFloatFieldState
 import me.danikvitek.lab1.presentation.fieldState.rememberIntFieldState
 import me.danikvitek.lab1.util.SafeSeededRandom
+import me.danikvitek.lab1.util.UiText
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.random.Random
@@ -104,12 +107,12 @@ fun TaskSolverScreen(
                     Tab(
                         selected = canvasOrPlot == CanvasOrPlot.CANVAS,
                         onClick = { canvasOrPlot = CanvasOrPlot.CANVAS },
-                        text = { Text("Graph") },
+                        text = { Text(stringResource(Res.string.tab_graph)) },
                     )
                     Tab(
                         selected = canvasOrPlot == CanvasOrPlot.PLOT,
                         onClick = { canvasOrPlot = CanvasOrPlot.PLOT },
-                        text = { Text("Plot") },
+                        text = { Text(stringResource(Res.string.tab_plot)) },
                     )
                 }
 
@@ -170,11 +173,11 @@ fun TaskSolverScreen(
                                 Image(
                                     modifier = Modifier.fillMaxSize(),
                                     bitmap = plotProvider.png.decodeToImageBitmap(),
-                                    contentDescription = "Convergence Plot",
+                                    contentDescription = stringResource(Res.string.convergence_plot_desc),
                                 )
                             } else {
                                 Text(
-                                    text = "Run the solver for at least 1 age to generate the convergence plot.",
+                                    text = stringResource(Res.string.plot_placeholder),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -204,16 +207,28 @@ fun TaskSolverScreen(
                         selected = activeRightTab == 0,
                         onClick = { activeRightTab = 0 },
                         text = {
-                            Text("1. Graph Builder (${taskMap.cities.size} cities, ${taskMap.roadLengthsKm.size} roads)")
+                            Text(
+                                stringResource(
+                                    Res.string.tab_graph_builder,
+                                    taskMap.cities.size,
+                                    taskMap.roadLengthsKm.size,
+                                )
+                            )
                         },
                     )
                     Tab(
                         selected = activeRightTab == 1,
                         onClick = { activeRightTab = 1 },
                         text = {
-                            val badge =
-                                if (bestRoute.isNotEmpty()) " • ${TaskSolverViewModel.formatKm(bestRoute.length)} km" else ""
-                            Text("2. Task Solver & Route$badge")
+                            val badge = if (bestRoute.isNotEmpty()) {
+                                stringResource(
+                                    Res.string.tab_task_solver_badge,
+                                    TaskSolverViewModel.formatKm(bestRoute.length),
+                                )
+                            } else {
+                                ""
+                            }
+                            Text(stringResource(Res.string.tab_task_solver, badge))
                         },
                     )
                 }
@@ -265,7 +280,7 @@ fun TaskSolverScreen(
 @Composable
 private fun MapManagementBar(
     taskMap: TaskMap,
-    statusMessage: String?,
+    statusMessage: UiText?,
     onMapNameChange: (String) -> Unit,
     onLoadPreset: (TaskMap) -> Unit,
     onSaveFile: () -> Unit,
@@ -289,14 +304,14 @@ private fun MapManagementBar(
             OutlinedTextField(
                 value = taskMap.name,
                 onValueChange = onMapNameChange,
-                label = { Text("Map Name") },
+                label = { Text(stringResource(Res.string.map_name_label)) },
                 singleLine = true,
                 modifier = Modifier.width(220.dp),
             )
 
             Box {
                 OutlinedButton(onClick = { presetsExpanded = true }) {
-                    Text("Load Preset ▾")
+                    Text(stringResource(Res.string.load_preset_button))
                 }
                 DropdownMenu(
                     expanded = presetsExpanded,
@@ -304,7 +319,15 @@ private fun MapManagementBar(
                 ) {
                     MapPresets.all.forEach { preset ->
                         DropdownMenuItem(
-                            text = { Text("${preset.name} (${preset.cities.size} cities)") },
+                            text = {
+                                Text(
+                                    stringResource(
+                                        Res.string.preset_item_format,
+                                        preset.name,
+                                        preset.cities.size,
+                                    )
+                                )
+                            },
                             onClick = {
                                 presetsExpanded = false
                                 onLoadPreset(preset)
@@ -315,25 +338,26 @@ private fun MapManagementBar(
             }
 
             Button(onClick = onSaveFile) {
-                Text("Save Map & Solution")
+                Text(stringResource(Res.string.save_map_and_solution))
             }
 
             OutlinedButton(onClick = onLoadFile) {
-                Text("Load Map File")
+                Text(stringResource(Res.string.load_map_file))
             }
 
             OutlinedButton(
                 onClick = onClearMap,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
             ) {
-                Text("Clear Map")
+                Text(stringResource(Res.string.clear_map))
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            if (!statusMessage.isNullOrBlank()) {
+            val messageText = statusMessage?.value
+            if (!messageText.isNullOrBlank()) {
                 Text(
-                    text = statusMessage,
+                    text = messageText,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 2,
@@ -376,7 +400,7 @@ private fun CanvasToolbar(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = "Tool:",
+                    text = stringResource(Res.string.tool_label),
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.align(Alignment.CenterVertically),
                 )
@@ -384,7 +408,7 @@ private fun CanvasToolbar(
                     FilterChip(
                         selected = activeTool == tool,
                         onClick = { onSelectTool(tool) },
-                        label = { Text(tool.label) },
+                        label = { Text(stringResource(tool.labelRes)) },
                     )
                 }
                 Spacer(modifier = Modifier.weight(1f))
@@ -393,20 +417,20 @@ private fun CanvasToolbar(
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                     modifier = Modifier.align(Alignment.CenterVertically),
                 ) {
-                    Text("Adjust Layout Now", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(Res.string.adjust_layout_now), style = MaterialTheme.typography.labelMedium)
                 }
             }
 
             val toolHint = when (activeTool) {
-                EditorTool.SELECT_MOVE -> "Hint: Drag any city on the canvas to reposition it, or click a city to select it."
-                EditorTool.ADD_CITY -> "Hint: Click anywhere on empty canvas space to place a new city."
+                EditorTool.SELECT_MOVE -> stringResource(Res.string.hint_select_move)
+                EditorTool.ADD_CITY -> stringResource(Res.string.hint_add_city)
                 EditorTool.CONNECT_ROAD -> if (selectedCityName != null) {
-                    "Hint: Selected \"$selectedCityName\" — now click another city on the canvas to connect them."
+                    stringResource(Res.string.hint_connect_road_selected, selectedCityName)
                 } else {
-                    "Hint: Click the first city on the canvas, then click a second city to create a road."
+                    stringResource(Res.string.hint_connect_road_unselected)
                 }
 
-                EditorTool.DELETE -> "Hint: Click any city node or road segment on the canvas to delete it."
+                EditorTool.DELETE -> stringResource(Res.string.hint_delete)
             }
             Text(
                 text = toolHint,
@@ -421,19 +445,19 @@ private fun CanvasToolbar(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = autoAdjustLayout, onCheckedChange = onToggleAutoAdjust)
-                    Text("Auto-adjust positions to km", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(Res.string.auto_adjust_positions), style = MaterialTheme.typography.bodySmall)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = showRoadLengths, onCheckedChange = onToggleRoadLengths)
-                    Text("Road km", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(Res.string.show_road_km), style = MaterialTheme.typography.bodySmall)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = showPheromones, onCheckedChange = onTogglePheromones)
-                    Text("Pheromones", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(Res.string.show_pheromones_short), style = MaterialTheme.typography.bodySmall)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = showBestRoute, onCheckedChange = onToggleBestRoute)
-                    Text("Best route", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(Res.string.show_best_route_short), style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -478,6 +502,7 @@ private fun InteractiveGraphCanvas(
     val textMeasurer = rememberTextMeasurer()
     val cityLabelStyle = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     val roadLabelStyle = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Medium)
+    val unitKm = stringResource(Res.string.unit_km)
 
     val currentTaskMap by rememberUpdatedState(taskMap)
     val currentTool by rememberUpdatedState(activeTool)
@@ -684,7 +709,7 @@ private fun InteractiveGraphCanvas(
                 val isViolating = road in violatingRoads
                 val isOnBestRoute = showBestRoute && bestRoute.contains(road)
 
-                val labelText = "${TaskSolverViewModel.formatKm(lengthKm)} km"
+                val labelText = "${TaskSolverViewModel.formatKm(lengthKm)} $unitKm"
                 val measured = textMeasurer.measure(
                     text = labelText,
                     style = roadLabelStyle,
@@ -823,21 +848,21 @@ private fun ValidationBanner(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
-                text = "Graph Constraints & Validation Issues",
+                text = stringResource(Res.string.validation_title),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onErrorContainer,
             )
 
             if (!validation.hasEnoughCities) {
                 Text(
-                    text = "• Add at least 2 cities to run the Ant Colony solver.",
+                    text = stringResource(Res.string.validation_min_cities),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onErrorContainer,
                 )
             } else {
                 if (!validation.isConnected) {
                     Text(
-                        text = "• The city graph is disconnected. Connect all components with roads.",
+                        text = stringResource(Res.string.validation_disconnected),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                     )
@@ -847,14 +872,14 @@ private fun ValidationBanner(
                         validation.lowDegreeCities.mapNotNull { taskMap.cities.getOrNull(it)?.name }.joinToString(", ")
                     val minRoads = if (taskMap.cities.size == 2) 1 else 2
                     Text(
-                        text = "• Each city needs at least $minRoads road(s) for a cyclic tour. Check: $names",
+                        text = stringResource(Res.string.validation_low_degree, minRoads, names),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                     )
                 }
                 if (validation.triangleViolations.isNotEmpty()) {
                     Text(
-                        text = "• Triangle inequality violated on ${validation.triangleViolations.size} triangle(s):",
+                        text = stringResource(Res.string.validation_triangle_header, validation.triangleViolations.size),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onErrorContainer,
@@ -864,18 +889,24 @@ private fun ValidationBanner(
                         val nameB = taskMap.cities.getOrNull(v.cityB)?.name ?: "#${v.cityB}"
                         val nameC = taskMap.cities.getOrNull(v.cityC)?.name ?: "#${v.cityC}"
                         Text(
-                            text = "   $nameA ↔ $nameB (${TaskSolverViewModel.formatKm(v.directLengthKm)} km) > $nameA → $nameC → $nameB (${
-                                TaskSolverViewModel.formatKm(
-                                    v.indirectLengthKm,
-                                )
-                            } km)",
+                            text = stringResource(
+                                Res.string.validation_triangle_item,
+                                nameA,
+                                nameB,
+                                TaskSolverViewModel.formatKm(v.directLengthKm),
+                                nameC,
+                                TaskSolverViewModel.formatKm(v.indirectLengthKm),
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                         )
                     }
                     if (validation.triangleViolations.size > 3) {
                         Text(
-                            text = "   ...and ${validation.triangleViolations.size - 3} more.",
+                            text = stringResource(
+                                Res.string.validation_triangle_more,
+                                validation.triangleViolations.size - 3,
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                         )
@@ -888,15 +919,15 @@ private fun ValidationBanner(
                 ) {
                     if (!validation.isConnected || validation.lowDegreeCities.isNotEmpty()) {
                         FilledTonalButton(onClick = onConnectAll) {
-                            Text("Connect All Cities")
+                            Text(stringResource(Res.string.btn_connect_all_cities))
                         }
                     }
                     if (validation.triangleViolations.isNotEmpty()) {
                         FilledTonalButton(onClick = onClampTriangleViolations) {
-                            Text("Auto-Clamp Violating Roads")
+                            Text(stringResource(Res.string.btn_auto_clamp_roads))
                         }
                         OutlinedButton(onClick = onRecalculateFromCanvas) {
-                            Text("Sync km from Canvas")
+                            Text(stringResource(Res.string.btn_sync_km_from_canvas))
                         }
                     }
                 }
@@ -945,7 +976,7 @@ private fun GraphBuilderPanel(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Cities (${taskMap.cities.size})",
+                    text = stringResource(Res.string.cities_header, taskMap.cities.size),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Row(
@@ -956,7 +987,7 @@ private fun GraphBuilderPanel(
                     OutlinedTextField(
                         value = newCityName,
                         onValueChange = { newCityName = it },
-                        label = { Text("New city name") },
+                        label = { Text(stringResource(Res.string.new_city_name_label)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
@@ -966,7 +997,7 @@ private fun GraphBuilderPanel(
                             newCityName = ""
                         },
                     ) {
-                        Text("Add")
+                        Text(stringResource(Res.string.btn_add))
                     }
                 }
 
@@ -1002,7 +1033,15 @@ private fun GraphBuilderPanel(
                                     onValueChange = { onRenameCity(idx, it) },
                                     singleLine = true,
                                     modifier = Modifier.weight(1f),
-                                    label = { Text(if (isStart) "Start City #${idx + 1}" else "City #${idx + 1}") },
+                                    label = {
+                                        Text(
+                                            if (isStart) {
+                                                stringResource(Res.string.start_city_number_label, idx + 1)
+                                            } else {
+                                                stringResource(Res.string.city_number_label, idx + 1)
+                                            }
+                                        )
+                                    },
                                 )
                                 TextButton(
                                     onClick = { onDeleteCity(idx) },
@@ -1035,15 +1074,15 @@ private fun GraphBuilderPanel(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        text = "Roads (${taskMap.roadLengthsKm.size})",
+                        text = stringResource(Res.string.roads_header, taskMap.roadLengthsKm.size),
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         TextButton(onClick = onConnectAll) {
-                            Text("Connect All")
+                            Text(stringResource(Res.string.btn_connect_all))
                         }
                         TextButton(onClick = onRecalculateFromCanvas) {
-                            Text("Canvas → km")
+                            Text(stringResource(Res.string.btn_canvas_to_km))
                         }
                     }
                 }
@@ -1057,14 +1096,14 @@ private fun GraphBuilderPanel(
                     ) {
                         CityDropdownSelector(
                             modifier = Modifier.weight(1f),
-                            label = "From",
+                            label = stringResource(Res.string.road_from_label),
                             cities = taskMap.cities.map { it.name },
                             selectedIndex = fromCityIdx.coerceIn(taskMap.cities.indices),
                             onSelectIndex = { fromCityIdx = it },
                         )
                         CityDropdownSelector(
                             modifier = Modifier.weight(1f),
-                            label = "To",
+                            label = stringResource(Res.string.road_to_label),
                             cities = taskMap.cities.map { it.name },
                             selectedIndex = toCityIdx.coerceIn(taskMap.cities.indices),
                             onSelectIndex = { toCityIdx = it },
@@ -1078,7 +1117,7 @@ private fun GraphBuilderPanel(
                         OutlinedTextField(
                             value = newRoadKmText,
                             onValueChange = { newRoadKmText = it },
-                            label = { Text("Length (km)") },
+                            label = { Text(stringResource(Res.string.road_length_km_label)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f),
@@ -1090,7 +1129,7 @@ private fun GraphBuilderPanel(
                                 onAddOrUpdateRoad(fromCityIdx, toCityIdx, km)
                             },
                         ) {
-                            Text("Set Road")
+                            Text(stringResource(Res.string.btn_set_road))
                         }
                     }
                 }
@@ -1140,7 +1179,7 @@ private fun GraphBuilderPanel(
                                     onValueChange = { updated ->
                                         kmText = updated
                                     },
-                                    suffix = { Text("km") },
+                                    suffix = { Text(stringResource(Res.string.unit_km)) },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                     modifier = Modifier.width(115.dp),
@@ -1152,7 +1191,7 @@ private fun GraphBuilderPanel(
                                         onAddOrUpdateRoad(road.city1, road.city2, parsed)
                                     },
                                 ) {
-                                    Text("Set")
+                                    Text(stringResource(Res.string.btn_set))
                                 }
                                 TextButton(
                                     onClick = { onDeleteRoad(road) },
@@ -1178,7 +1217,7 @@ private fun CityDropdownSelector(
     onSelectIndex: (Int) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val selectedName = cities.getOrNull(selectedIndex) ?: "None"
+    val selectedName = cities.getOrNull(selectedIndex) ?: stringResource(Res.string.dropdown_none)
 
     Box(modifier = modifier) {
         OutlinedButton(
@@ -1295,14 +1334,14 @@ private fun SolverAndResultsPanel(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Ant Colony Task Solver",
+                    text = stringResource(Res.string.solver_card_title),
                     style = MaterialTheme.typography.titleMedium,
                 )
 
                 if (taskMap.cities.isNotEmpty()) {
                     CityDropdownSelector(
                         modifier = Modifier.fillMaxWidth(),
-                        label = "Start / Depot City",
+                        label = stringResource(Res.string.start_depot_city_label),
                         cities = taskMap.cities.map { it.name },
                         selectedIndex = taskMap.startCityIndex.coerceIn(taskMap.cities.indices),
                         onSelectIndex = viewModel::setStartCity,
@@ -1325,18 +1364,21 @@ private fun SolverAndResultsPanel(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Previous Best Route Saved (${TaskSolverViewModel.formatKm(bestRoute.length)} km)",
+                                    text = stringResource(
+                                        Res.string.warm_start_title,
+                                        TaskSolverViewModel.formatKm(bestRoute.length),
+                                    ),
                                     style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                                 )
                                 Text(
-                                    text = "Rerunning the simulation will warm-start from this route.",
+                                    text = stringResource(Res.string.warm_start_subtitle),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                                 )
                             }
                             TextButton(onClick = viewModel::clearSavedSolution) {
-                                Text("Clear Solution")
+                                Text(stringResource(Res.string.btn_clear_solution))
                             }
                         }
                     }
@@ -1352,7 +1394,13 @@ private fun SolverAndResultsPanel(
                         enabled = validation.isValidForSimulation && !autoRunActive,
                         onClick = { startOrResetSimulation(runImmediately = true) },
                     ) {
-                        Text(if (bestRoute.isNotEmpty()) "Rerun Solver (Warm-Start)" else "Solve Optimal Route")
+                        Text(
+                            if (bestRoute.isNotEmpty()) {
+                                stringResource(Res.string.btn_rerun_solver_warm_start)
+                            } else {
+                                stringResource(Res.string.btn_solve_optimal_route)
+                            }
+                        )
                     }
 
                     OutlinedButton(
@@ -1365,7 +1413,13 @@ private fun SolverAndResultsPanel(
                             }
                         },
                     ) {
-                        Text(if (autoRunActive) "Pause" else "Init / Reset")
+                        Text(
+                            if (autoRunActive) {
+                                stringResource(Res.string.btn_pause)
+                            } else {
+                                stringResource(Res.string.btn_init_reset)
+                            }
+                        )
                     }
 
                     OutlinedButton(
@@ -1375,7 +1429,7 @@ private fun SolverAndResultsPanel(
                             coroutineScope.launch { viewModel.stepSimulation() }
                         },
                     ) {
-                        Text("Step (Age $age)")
+                        Text(stringResource(Res.string.btn_step_age, age))
                     }
 
                     if (age > 0) {
@@ -1384,7 +1438,7 @@ private fun SolverAndResultsPanel(
                                 runCatching { viewModel.plot(taskMap.cities.size).save() }
                             },
                         ) {
-                            Text("Save Plot")
+                            Text(stringResource(Res.string.btn_save_plot))
                         }
                     }
                 }
@@ -1397,10 +1451,16 @@ private fun SolverAndResultsPanel(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = autoScaleQ, onCheckedChange = { autoScaleQ = it })
-                        Text("Auto-scale Q to km road distances", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(Res.string.auto_scale_q_label), style = MaterialTheme.typography.bodySmall)
                     }
                     TextButton(onClick = { showAdvancedParams = !showAdvancedParams }) {
-                        Text(if (showAdvancedParams) "Hide ACO Params ▲" else "ACO Params ▼")
+                        Text(
+                            if (showAdvancedParams) {
+                                stringResource(Res.string.btn_hide_aco_params)
+                            } else {
+                                stringResource(Res.string.btn_show_aco_params)
+                            }
+                        )
                     }
                 }
 
@@ -1417,21 +1477,21 @@ private fun SolverAndResultsPanel(
                             ValidatedField(
                                 modifier = Modifier.fillMaxWidth(),
                                 state = ages,
-                                label = "Number of ages",
+                                label = stringResource(Res.string.param_ages),
                             )
                             ValidatedField(
                                 modifier = Modifier.fillMaxWidth(),
                                 state = antsPercent,
-                                label = "% of ants per city",
+                                label = stringResource(Res.string.param_ants_per_city),
                             )
                             ValidatedField(
                                 modifier = Modifier.fillMaxWidth(),
                                 state = eliteAntsPercent,
-                                label = "% of elite ants",
+                                label = stringResource(Res.string.param_elite_ants),
                             )
                             OutlinedTextField(
                                 modifier = Modifier.fillMaxWidth(),
-                                label = { Text("RNG Seed (optional)") },
+                                label = { Text(stringResource(Res.string.param_rng_seed_optional)) },
                                 singleLine = true,
                                 value = seed,
                                 onValueChange = { seed = it.trim() },
@@ -1444,28 +1504,28 @@ private fun SolverAndResultsPanel(
                             ValidatedField(
                                 modifier = Modifier.fillMaxWidth(),
                                 state = distanceImportance,
-                                label = "Pheromone weight (α)",
+                                label = stringResource(Res.string.param_pheromone_weight),
                             )
                             ValidatedField(
                                 modifier = Modifier.fillMaxWidth(),
                                 state = pheromoneImportance,
-                                label = "Visibility weight (β)",
+                                label = stringResource(Res.string.param_visibility_weight),
                             )
                             ValidatedField(
                                 modifier = Modifier.fillMaxWidth(),
                                 state = evaporationRate,
-                                label = "Evaporation rate (ρ)",
+                                label = stringResource(Res.string.param_evaporation_rate),
                             )
                             ValidatedField(
                                 modifier = Modifier.fillMaxWidth(),
                                 state = initialPheromoneLevel,
-                                label = "Initial pheromone",
+                                label = stringResource(Res.string.param_initial_pheromone),
                             )
                             if (!autoScaleQ) {
                                 ValidatedField(
                                     modifier = Modifier.fillMaxWidth(),
                                     state = customQ,
-                                    label = "Deposit multiplier (Q)",
+                                    label = stringResource(Res.string.param_deposit_multiplier),
                                 )
                             }
                         }
@@ -1488,7 +1548,7 @@ private fun SolverAndResultsPanel(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Optimal Tour Solution",
+                        text = stringResource(Res.string.optimal_tour_title),
                         style = MaterialTheme.typography.titleMedium,
                     )
                     if (bestRoute.isNotEmpty()) {
@@ -1497,7 +1557,10 @@ private fun SolverAndResultsPanel(
                             shape = RoundedCornerShape(16.dp),
                         ) {
                             Text(
-                                text = "Total: ${TaskSolverViewModel.formatKm(bestRoute.length)} km",
+                                text = stringResource(
+                                    Res.string.total_km_badge,
+                                    TaskSolverViewModel.formatKm(bestRoute.length),
+                                ),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
@@ -1508,7 +1571,7 @@ private fun SolverAndResultsPanel(
 
                 if (bestRoute.isEmpty()) {
                     Text(
-                        text = "No route computed yet. Click \"Solve Optimal Route\" above to find the shortest cyclic tour visiting all cities.",
+                        text = stringResource(Res.string.no_route_computed_yet),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1530,6 +1593,7 @@ private fun SolverAndResultsPanel(
 
                     HorizontalDivider()
 
+                    val unitKm = stringResource(Res.string.unit_km)
                     itinerary.forEach { leg ->
                         Row(
                             modifier = Modifier
@@ -1544,13 +1608,13 @@ private fun SolverAndResultsPanel(
                                 modifier = Modifier.weight(1f),
                             )
                             Text(
-                                text = "+${TaskSolverViewModel.formatKm(leg.distanceKm)} km",
+                                text = "+${TaskSolverViewModel.formatKm(leg.distanceKm)} $unitKm",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium,
                                 modifier = Modifier.width(95.dp),
                             )
                             Text(
-                                text = "(Σ ${TaskSolverViewModel.formatKm(leg.cumulativeKm)} km)",
+                                text = "(Σ ${TaskSolverViewModel.formatKm(leg.cumulativeKm)} $unitKm)",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.width(105.dp),

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<resources>
+    <!-- Window & App Navigation -->
+    <string name="window_title">Лабораторна робота №1 — Мурашиний алгоритм</string>
+    <string name="app_title">ІІС оптимізації маршрутів (Мурашиний алгоритм)</string>
+    <string name="nav_task_solver">Інтелектуальна інформаційна система (Граф і розв’язання)</string>
+    <string name="nav_experiment_runner">Експериментальне дослідження (Випадковий граф)</string>
+
+    <!-- Common Tabs & Units -->
+    <string name="tab_graph">Граф</string>
+    <string name="tab_plot">Графік</string>
+    <string name="unit_km">км</string>
+    <string name="dropdown_none">Немає</string>
+
+    <!-- Map Management Bar -->
+    <string name="map_name_label">Назва мапи</string>
+    <string name="load_preset_button">Шаблони мап ▾</string>
+    <string name="preset_item_format">%1$s (%2$d міст)</string>
+    <string name="save_map_and_solution">Зберегти мапу та маршрут</string>
+    <string name="load_map_file">Завантажити мапу</string>
+    <string name="clear_map">Очистити мапу</string>
+    <string name="default_new_map_name">Нова користувацька мапа</string>
+    <string name="default_city_name">Місто %1$d</string>
+
+    <!-- Canvas Toolbar & Tools -->
+    <string name="tool_label">Інструмент:</string>
+    <string name="tool_select_move">Вибір / Переміщення</string>
+    <string name="tool_add_city">Додати місто</string>
+    <string name="tool_connect_road">З’єднати дорогою</string>
+    <string name="tool_delete">Видалити</string>
+    <string name="adjust_layout_now">Вирівняти за відстанями</string>
+
+    <string name="hint_select_move">Підказка: перетягніть місто на полотні, щоб змінити його позицію, або натисніть для вибору.</string>
+    <string name="hint_add_city">Підказка: натисніть на вільне місце на полотні, щоб розмістити нове місто.</string>
+    <string name="hint_connect_road_selected">Підказка: обрано «%1$s» — тепер натисніть на інше місто, щоб з’єднати їх дорогою.</string>
+    <string name="hint_connect_road_unselected">Підказка: натисніть на перше місто на полотні, а потім на друге, щоб прокласти дорогу.</string>
+    <string name="hint_delete">Підказка: натисніть на місто або відрізок дороги на полотні, щоб видалити його.</string>
+
+    <string name="auto_adjust_positions">Авто-позиціонування за км</string>
+    <string name="show_road_km">Довжини доріг (км)</string>
+    <string name="show_pheromones_short">Феромони</string>
+    <string name="show_best_route_short">Найкращий маршрут</string>
+
+    <!-- Plot & Right Panel Tabs -->
+    <string name="convergence_plot_desc">Графік збіжності</string>
+    <string name="plot_placeholder">Запустіть алгоритм хоча б на 1 епоху, щоб побудувати графік збіжності.</string>
+    <string name="tab_graph_builder">1. Побудова графа (%1$d міст, %2$d доріг)</string>
+    <string name="tab_task_solver">2. Пошук маршруту%1$s</string>
+    <string name="tab_task_solver_badge"> • %1$s км</string>
+
+    <!-- Validation Banner -->
+    <string name="validation_title">Обмеження графа та помилки валідації</string>
+    <string name="validation_min_cities">• Додайте щонайменше 2 міста для запуску мурашиного алгоритму.</string>
+    <string name="validation_disconnected">• Граф міст незв’язний. З’єднайте всі компоненти дорогами.</string>
+    <string name="validation_low_degree">• Кожне місто повинно мати щонайменше %1$d дор. для циклічного маршруту. Перевірте: %2$s</string>
+    <string name="validation_triangle_header">• Порушено нерівність трикутника у %1$d трикутниках:</string>
+    <string name="validation_triangle_item">   %1$s ↔ %2$s (%3$s км) &gt; %1$s → %4$s → %2$s (%5$s км)</string>
+    <string name="validation_triangle_more">   ...та ще %1$d.</string>
+    <string name="btn_connect_all_cities">З’єднати всі міста</string>
+    <string name="btn_auto_clamp_roads">Виправити нерівність трикутника</string>
+    <string name="btn_sync_km_from_canvas">Синхронізувати км з полотна</string>
+
+    <!-- Graph Builder Panel -->
+    <string name="cities_header">Міста (%1$d)</string>
+    <string name="new_city_name_label">Назва нового міста</string>
+    <string name="btn_add">Додати</string>
+    <string name="start_city_number_label">Початкове місто №%1$d</string>
+    <string name="city_number_label">Місто №%1$d</string>
+    <string name="roads_header">Дороги (%1$d)</string>
+    <string name="btn_connect_all">З’єднати всі</string>
+    <string name="btn_canvas_to_km">Полотно → км</string>
+    <string name="road_from_label">Звідки</string>
+    <string name="road_to_label">Куди</string>
+    <string name="road_length_km_label">Довжина (км)</string>
+    <string name="btn_set_road">Задати дорогу</string>
+    <string name="btn_set">ОК</string>
+
+    <!-- Solver & Results Panel -->
+    <string name="solver_card_title">Мурашиний алгоритм оптимізації маршруту</string>
+    <string name="start_depot_city_label">Початкове місто (база)</string>
+    <string name="warm_start_title">Збережено попередній найкращий маршрут (%1$s км)</string>
+    <string name="warm_start_subtitle">Повторний запуск розпочнеться з цього маршруту як початкового наближення.</string>
+    <string name="btn_clear_solution">Скинути розв’язок</string>
+    <string name="btn_rerun_solver_warm_start">Перезапустити (з попереднього)</string>
+    <string name="btn_solve_optimal_route">Знайти оптимальний маршрут</string>
+    <string name="btn_pause">Пауза</string>
+    <string name="btn_init_reset">Ініц. / Скинути</string>
+    <string name="btn_step_age">Крок (Епоха %1$d)</string>
+    <string name="btn_save_plot">Зберегти графік</string>
+    <string name="auto_scale_q_label">Авто-масштабування Q під відстані в км</string>
+    <string name="btn_hide_aco_params">Сховати параметри ▲</string>
+    <string name="btn_show_aco_params">Параметри АМК ▼</string>
+
+    <string name="param_ages">Кількість епох</string>
+    <string name="param_ants_per_city">% мурах від кількості міст</string>
+    <string name="param_elite_ants">% елітних мурах</string>
+    <string name="param_rng_seed_optional">Зерно ГВЧ (необов’язково)</string>
+    <string name="param_pheromone_weight">Вага дистанції (α)</string>
+    <string name="param_visibility_weight">Вага феромону (β)</string>
+    <string name="param_evaporation_rate">Коефіцієнт випаровування (ρ)</string>
+    <string name="param_initial_pheromone">Початковий феромон</string>
+    <string name="param_deposit_multiplier">Множник відкладання (Q)</string>
+
+    <string name="optimal_tour_title">Оптимальний циклічний маршрут</string>
+    <string name="total_km_badge">Разом: %1$s км</string>
+    <string name="no_route_computed_yet">Маршрут ще не обчислено. Натисніть «Знайти оптимальний маршрут» вище, щоб знайти найкоротший циклічний обхід усіх міст.</string>
+
+    <!-- Status Messages -->
+    <string name="status_loaded_preset">Завантажено шаблон: %1$s</string>
+    <string name="status_adjusted_positions">Позиції міст відкориговано відповідно до дорожніх відстаней.</string>
+    <string name="status_added_city">Додано місто «%1$s».</string>
+    <string name="status_removed_city">Видалено місто «%1$s».</string>
+    <string name="status_set_road">Встановлено дорогу %1$s ↔ %2$s: %3$s км.</string>
+    <string name="status_road_already_exists">Дорога між %1$s та %2$s вже існує (%3$s км).</string>
+    <string name="status_removed_road">Видалено дорогу %1$s ↔ %2$s.</string>
+    <string name="status_connected_missing_roads">Додано %1$d відсутніх доріг за відстанями на полотні.</string>
+    <string name="status_all_pairs_connected">Усі пари міст вже з’єднані дорогами.</string>
+    <string name="status_clamped_triangle">Довжини доріг скориговано для виконання нерівності трикутника.</string>
+    <string name="status_recalculated_from_canvas">Довжини доріг перераховано за поточними позиціями на полотні.</string>
+    <string name="status_cleared_map">Карту очищено.</string>
+    <string name="status_cleared_solution">Збережений розв’язок очищено. Наступний запуск почнеться з нуля.</string>
+    <string name="status_saved_map">Карту та розв’язок збережено у %1$s</string>
+    <string name="status_loaded_file_with_route">Завантажено «%1$s» зі збереженим маршрутом (%2$s км).</string>
+    <string name="status_loaded_file">Завантажено «%1$s».</string>
+    <string name="status_cannot_start_invalid">Неможливо запустити: спочатку виправте помилки валідації графа.</string>
+    <string name="status_init_warm_start">Алгоритм ініціалізовано з попереднього найкращого маршруту (%1$s км).</string>
+    <string name="status_init_solver">Алгоритм ініціалізовано (%1$d мурах, %2$d епох).</string>
+    <string name="status_finished_optimal">Завершено! Довжина оптимального маршруту: %1$s км.</string>
+    <string name="status_finished_no_cycle">Завершено, але мурахи не змогли знайти повний гамільтонів цикл у цьому графі.</string>
+
+    <!-- Experiment Runner Screen -->
+    <string name="exp_plot_desc">Графік довжини найкоротшого знайденого маршруту</string>
+    <string name="exp_canvas_desc">Симуляція мурашиної колонії</string>
+    <string name="param_rng_seed">Зерно ГВЧ (RNG seed)</string>
+    <string name="param_rng_seed_blank_hint">Порожнє поле використовує системну ентропію</string>
+    <string name="param_cities_amount">Кількість міст</string>
+    <string name="param_ants_percent">% мурах від кількості міст</string>
+    <string name="param_elite_ants_all">% елітних мурах серед усіх</string>
+    <string name="param_distance_importance">Важливість відстані (alpha)</string>
+    <string name="param_pheromone_importance">Важливість феромону (beta)</string>
+    <string name="param_deposit_multiplier_q">Множник відкладання феромону (Q)</string>
+    <string name="param_initial_pheromone_level">Початковий рівень феромону</string>
+    <string name="btn_init">Ініц.</string>
+    <string name="btn_reset">Скинути</string>
+    <string name="btn_run">Запуск</string>
+    <string name="shortest_route_so_far">Найкоротший маршрут наразі:</string>
+    <string name="show_pheromones">Показувати феромони</string>
+    <string name="show_best_route">Показувати найкращий маршрут</string>
+
+    <!-- Field Validation Constraints -->
+    <string name="err_positive_int">Має бути додатним цілим числом</string>
+    <string name="err_non_negative_int">Має бути невід’ємним цілим числом</string>
+    <string name="err_range_int">Має бути цілим числом у діапазоні %1$s</string>
+    <string name="err_positive_float">Має бути додатним дійсним числом</string>
+    <string name="err_non_negative_float">Має бути невід’ємним дійсним числом</string>
+    <string name="err_range_float">Має бути дійсним числом у діапазоні %1$s</string>
+</resources>

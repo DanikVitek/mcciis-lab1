@@ -1,5 +1,7 @@
 package me.danikvitek.lab1.data
 
+import me.danikvitek.lab1.util.AppLanguage
+import me.danikvitek.lab1.util.AppLocaleManager
 import org.jetbrains.kotlinx.dataframe.api.dataFrameOf
 import org.jetbrains.kotlinx.kandy.dsl.continuous
 import org.jetbrains.kotlinx.kandy.dsl.plot
@@ -14,6 +16,7 @@ import kotlin.io.path.Path
 
 class JvmPlotter() : Plotter() {
     override fun plot(citiesAmount: Int): PlotProvider {
+        val uk = AppLocaleManager.currentLanguage.value == AppLanguage.UKRAINIAN
         val lengths = buildList {
             addAll(buffer)
         }
@@ -31,9 +34,9 @@ class JvmPlotter() : Plotter() {
                 continuous(min = 1)
             }
             layout {
-                title = "$citiesAmount cities"
-                xAxisLabel = "Iteration"
-                yAxisLabel = "Length"
+                title = if (uk) "$citiesAmount міст" else "$citiesAmount cities"
+                xAxisLabel = if (uk) "Епоха" else "Iteration"
+                yAxisLabel = if (uk) "Довжина маршруту" else "Length"
 
                 size = 1000 to 450
             }

@@ -18,6 +18,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.runBlocking
+import lab1.shared.generated.resources.*
 import me.danikvitek.lab1.CanvasOrPlot
 import me.danikvitek.lab1.data.PlotProvider
 import me.danikvitek.lab1.domain.model.CyclicRoute
@@ -29,6 +30,7 @@ import me.danikvitek.lab1.presentation.fieldState.ValidatedField
 import me.danikvitek.lab1.presentation.fieldState.rememberFloatFieldState
 import me.danikvitek.lab1.presentation.fieldState.rememberIntFieldState
 import me.danikvitek.lab1.util.SafeSeededRandom
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.ceil
 import kotlin.math.pow
 import kotlin.random.Random
@@ -70,12 +72,12 @@ fun ExperimentRunnerScreen(
                 Tab(
                     selected = canvasOrPlot == CanvasOrPlot.CANVAS,
                     onClick = { canvasOrPlot = CanvasOrPlot.CANVAS },
-                    text = { Text("Graph") },
+                    text = { Text(stringResource(Res.string.tab_graph)) },
                 )
                 Tab(
                     selected = canvasOrPlot == CanvasOrPlot.PLOT,
                     onClick = { canvasOrPlot = CanvasOrPlot.PLOT },
-                    text = { Text("Plot") },
+                    text = { Text(stringResource(Res.string.tab_plot)) },
                 )
             }
             when (canvasOrPlot) {
@@ -94,7 +96,7 @@ fun ExperimentRunnerScreen(
                     Image(
                         modifier = Modifier.widthIn(max = 900.dp),
                         bitmap = plotProvider.png.decodeToImageBitmap(),
-                        contentDescription = "Plot of the length of the shortest path found so far",
+                        contentDescription = stringResource(Res.string.exp_plot_desc),
                     )
             }
         }
@@ -128,7 +130,7 @@ fun MapCanvas(
     val showBestRoute by showBestRoute
     Canvas(
         modifier = modifier,
-        contentDescription = "Ant colony simulation",
+        contentDescription = stringResource(Res.string.exp_canvas_desc),
     ) {
         /** Padding from the canvas edges to draw points with */
         val imgPadding = 20.dp.toPx()
@@ -262,14 +264,14 @@ fun SimulationControls(
         ) {
             TextField(
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("RNG seed") },
+                label = { Text(stringResource(Res.string.param_rng_seed)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 value = seed,
                 onValueChange = { seed = it.trim() },
                 supportingText = {
                     if (seed.isBlank()) {
-                        Text("Blank seed will use a system's entropy")
+                        Text(stringResource(Res.string.param_rng_seed_blank_hint))
                     }
                 },
             )
@@ -277,13 +279,13 @@ fun SimulationControls(
             ValidatedField(
                 modifier = Modifier.fillMaxWidth(),
                 state = citiesAmount,
-                label = "Number of cities",
+                label = stringResource(Res.string.param_cities_amount),
             )
 
             ValidatedField(
                 modifier = Modifier.fillMaxWidth(),
                 state = antsPercent,
-                label = "% of ants per cities amount",
+                label = stringResource(Res.string.param_ants_percent),
             )
         }
         Column(
@@ -294,19 +296,19 @@ fun SimulationControls(
             ValidatedField(
                 modifier = Modifier.fillMaxWidth(),
                 state = eliteAntsPercent,
-                label = "% of elite ants among all ants",
+                label = stringResource(Res.string.param_elite_ants_all),
             )
 
             ValidatedField(
                 modifier = Modifier.fillMaxWidth(),
                 state = ages,
-                label = "Number of ages",
+                label = stringResource(Res.string.param_ages),
             )
 
             ValidatedField(
                 modifier = Modifier.fillMaxWidth(),
                 state = distanceImportance,
-                label = "Distance importance (alpha)",
+                label = stringResource(Res.string.param_distance_importance),
             )
         }
         Column(
@@ -317,19 +319,19 @@ fun SimulationControls(
             ValidatedField(
                 modifier = Modifier.fillMaxWidth(),
                 state = pheromoneImportance,
-                label = "Pheromone importance (beta)",
+                label = stringResource(Res.string.param_pheromone_importance),
             )
 
             ValidatedField(
                 modifier = Modifier.fillMaxWidth(),
                 state = pheromoneDepositMultiplier,
-                label = "Pheromone deposit multiplier (Q)",
+                label = stringResource(Res.string.param_deposit_multiplier_q),
             )
 
             ValidatedField(
                 modifier = Modifier.fillMaxWidth(),
                 state = initialPheromoneLevel,
-                label = "Initial pheromone level",
+                label = stringResource(Res.string.param_initial_pheromone_level),
             )
 
             Row(
@@ -369,7 +371,11 @@ fun SimulationControls(
                     },
                 ) {
                     Text(
-                        text = if (simStatus == SimulationStatus.UNINITIALIZED) "Init" else "Reset",
+                        text = if (simStatus == SimulationStatus.UNINITIALIZED) {
+                            stringResource(Res.string.btn_init)
+                        } else {
+                            stringResource(Res.string.btn_reset)
+                        },
                     )
                 }
                 Button(
@@ -379,14 +385,18 @@ fun SimulationControls(
                     },
                 ) {
                     Text(
-                        text = if (simStatus == SimulationStatus.RUNNING) (age + 1).toString() else "Run",
+                        text = if (simStatus == SimulationStatus.RUNNING) {
+                            (age + 1).toString()
+                        } else {
+                            stringResource(Res.string.btn_run)
+                        },
                     )
                 }
             }
 
             Column {
                 Text(
-                    text = "Shortest route length so far:",
+                    text = stringResource(Res.string.shortest_route_so_far),
                 )
                 Text(
                     text = bestRouteLength.toString(),
@@ -400,7 +410,7 @@ fun SimulationControls(
                     checked = showPheromones,
                     onCheckedChange = { showPheromones = it },
                 )
-                Text(text = "Show pheromones")
+                Text(text = stringResource(Res.string.show_pheromones))
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -410,12 +420,12 @@ fun SimulationControls(
                     checked = showBestRoute,
                     onCheckedChange = { showBestRoute = it },
                 )
-                Text(text = "Show best route")
+                Text(text = stringResource(Res.string.show_best_route))
             }
             Button(
                 onClick = plotProviderState.value::save,
             ) {
-                Text(text = "Save plot")
+                Text(text = stringResource(Res.string.btn_save_plot))
             }
         }
     }

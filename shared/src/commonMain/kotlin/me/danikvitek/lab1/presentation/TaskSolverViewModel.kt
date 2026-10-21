@@ -4,23 +4,24 @@ import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import me.danikvitek.lab1.data.MapFileStorage
-import me.danikvitek.lab1.data.MapPresets
-import me.danikvitek.lab1.data.PlotProvider
-import me.danikvitek.lab1.data.Plotter
-import me.danikvitek.lab1.data.getPlotter
+import lab1.shared.generated.resources.*
+import me.danikvitek.lab1.data.*
 import me.danikvitek.lab1.domain.Simulation
 import me.danikvitek.lab1.domain.layout.GraphLayoutEngine
 import me.danikvitek.lab1.domain.model.*
+import me.danikvitek.lab1.util.AppLanguage
+import me.danikvitek.lab1.util.AppLocaleManager
+import me.danikvitek.lab1.util.UiText
+import org.jetbrains.compose.resources.StringResource
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
-enum class EditorTool(val label: String) {
-    SELECT_MOVE("Select / Move"),
-    ADD_CITY("Add City"),
-    CONNECT_ROAD("Connect Road"),
-    DELETE("Delete"),
+enum class EditorTool(val labelRes: StringResource) {
+    SELECT_MOVE(Res.string.tool_select_move),
+    ADD_CITY(Res.string.tool_add_city),
+    CONNECT_ROAD(Res.string.tool_connect_road),
+    DELETE(Res.string.tool_delete),
 }
 
 data class RouteLeg(
@@ -63,8 +64,10 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
     val autoAdjustLayoutState: StateFlow<Boolean>
         field = MutableStateFlow(true)
 
-    val statusMessageState: StateFlow<String?>
-        field = MutableStateFlow<String?>("Loaded preset: ${MapPresets.ukrainianCities.name}")
+    val statusMessageState: StateFlow<UiText?>
+        field = MutableStateFlow<UiText?>(
+            UiText(Res.string.status_loaded_preset, MapPresets.ukrainianCities.name),
+        )
 
     fun plot(citiesAmount: Int): PlotProvider = plotter.plot(citiesAmount.coerceAtLeast(2))
 
@@ -91,7 +94,7 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         if (current.cities.size >= 2 && current.roadLengthsKm.isNotEmpty()) {
             val adjustedCities = GraphLayoutEngine.adjustPositions(current.cities, current.roadLengthsKm)
             updateTaskMap(current.copy(cities = adjustedCities), runAutoLayout = false)
-            statusMessageState.value = "Adjusted city positions according to road distances."
+            statusMessageState.value = UiText(Res.string.status_adjusted_positions)
         }
     }
 
@@ -132,7 +135,11 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
     fun addCity(position: Offset, customName: String? = null) {
         val current = taskMapState.value
         val nextNumber = current.cities.size + 1
-        val name = customName?.trim()?.takeIf { it.isNotEmpty() } ?: "City $nextNumber"
+        val defaultPrefix = when (AppLocaleManager.currentLanguage.value) {
+            AppLanguage.UKRAINIAN -> "Місто"
+            AppLanguage.ENGLISH -> "City"
+        }
+        val name = customName?.trim()?.takeIf { it.isNotEmpty() } ?: "$defaultPrefix $nextNumber"
         val clampedPos = Offset(position.x.coerceIn(0.04f, 0.96f), position.y.coerceIn(0.04f, 0.96f))
         val newCities = current.cities + NamedCity(name = name, position = clampedPos)
         // Adding a city invalidates any active simulation run
@@ -147,7 +154,7 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
             runAutoLayout = false,
         )
         selectedCityIndexState.value = newCities.lastIndex
-        statusMessageState.value = "Added city \"$name\"."
+        statusMessageState.value = UiText(Res.string.status_added_city, name)
     }
 
     fun renameCity(index: Int, newName: String) {
@@ -207,7 +214,7 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
             ),
             runAutoLayout = false,
         )
-        statusMessageState.value = "Removed city \"$removedName\"."
+        statusMessageState.value = UiText(Res.string.status_removed_city, removedName)
     }
 
     fun estimateCanvasScaleKm(): Float {
@@ -247,7 +254,12 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         )
         val c1Name = current.cities[city1].name
         val c2Name = current.cities[city2].name
-        statusMessageState.value = "Set road $c1Name ↔ $c2Name to ${newRoads[road]} km."
+        statusMessageState.value = UiText(
+            Res.string.status_set_road,
+            c1Name,
+            c2Name,
+            formatKm(newRoads[road]!!),
+        )
     }
 
     fun addRoadFromCanvasClick(city1: Int, city2: Int) {
@@ -255,7 +267,12 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         if (city1 == city2 || city1 !in current.cities.indices || city2 !in current.cities.indices) return
         val existing = current.roadLengthsKm[Road(city1, city2)]
         if (existing != null) {
-            statusMessageState.value = "Road between ${current.cities[city1].name} and ${current.cities[city2].name} already exists ($existing km)."
+            statusMessageState.value = UiText(
+                Res.string.status_road_already_exists,
+                current.cities[city1].name,
+                current.cities[city2].name,
+                formatKm(existing),
+            )
             return
         }
         val scaleKm = estimateCanvasScaleKm()
@@ -281,7 +298,7 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         )
         val c1Name = current.cities.getOrNull(road.city1)?.name ?: "#${road.city1}"
         val c2Name = current.cities.getOrNull(road.city2)?.name ?: "#${road.city2}"
-        statusMessageState.value = "Removed road $c1Name ↔ $c2Name."
+        statusMessageState.value = UiText(Res.string.status_removed_road, c1Name, c2Name)
     }
 
     fun connectAllCitiesFromCanvas() {
@@ -306,9 +323,9 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
             simStatusState.value = SimulationStatus.UNINITIALIZED
             pheromonesState.value = emptyMap()
             updateTaskMap(current.copy(roadLengthsKm = newRoads), runAutoLayout = false)
-            statusMessageState.value = "Connected $addedCount missing road(s) using canvas distances."
+            statusMessageState.value = UiText(Res.string.status_connected_missing_roads, addedCount)
         } else {
-            statusMessageState.value = "All city pairs are already connected."
+            statusMessageState.value = UiText(Res.string.status_all_pairs_connected)
         }
     }
 
@@ -354,7 +371,7 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         simStatusState.value = SimulationStatus.UNINITIALIZED
         pheromonesState.value = emptyMap()
         updateTaskMap(current.copy(roadLengthsKm = roads))
-        statusMessageState.value = "Clamped violating road lengths to satisfy the triangle inequality."
+        statusMessageState.value = UiText(Res.string.status_clamped_triangle)
     }
 
     fun recalculateAllDistancesFromCanvas() {
@@ -369,7 +386,7 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         simStatusState.value = SimulationStatus.UNINITIALIZED
         pheromonesState.value = emptyMap()
         updateTaskMap(current.copy(roadLengthsKm = newRoads), runAutoLayout = false)
-        statusMessageState.value = "Recalculated road lengths from current canvas positions."
+        statusMessageState.value = UiText(Res.string.status_recalculated_from_canvas)
     }
 
     fun clearMap() {
@@ -379,9 +396,14 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         ageState.value = 0
         pheromonesState.value = emptyMap()
         selectedCityIndexState.value = null
+        val defaultMapName = if (AppLocaleManager.currentLanguage.value == AppLanguage.UKRAINIAN) {
+            "Нова користувацька карта"
+        } else {
+            "New Custom Map"
+        }
         updateTaskMap(
             TaskMap(
-                name = "New Custom Map",
+                name = defaultMapName,
                 cities = emptyList(),
                 roadLengthsKm = emptyMap(),
                 startCityIndex = 0,
@@ -389,7 +411,7 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
             ),
             runAutoLayout = false,
         )
-        statusMessageState.value = "Cleared map."
+        statusMessageState.value = UiText(Res.string.status_cleared_map)
     }
 
     fun clearSavedSolution() {
@@ -400,7 +422,7 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         ageState.value = 0
         pheromonesState.value = emptyMap()
         updateTaskMap(current.copy(savedBestRouteCities = emptyList()), runAutoLayout = false)
-        statusMessageState.value = "Cleared saved route solution. Next run will start from scratch."
+        statusMessageState.value = UiText(Res.string.status_cleared_solution)
     }
 
     fun loadPreset(preset: TaskMap) {
@@ -411,7 +433,7 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         pheromonesState.value = emptyMap()
         selectedCityIndexState.value = null
         updateTaskMap(preset, runAutoLayout = false)
-        statusMessageState.value = "Loaded preset: ${preset.name}"
+        statusMessageState.value = UiText(Res.string.status_loaded_preset, preset.name)
     }
 
     fun saveMapToFile() {
@@ -420,7 +442,7 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         )
         val savedPath = MapFileStorage.saveMapWithDialog(current)
         if (savedPath != null) {
-            statusMessageState.value = "Saved map & solution to $savedPath"
+            statusMessageState.value = UiText(Res.string.status_saved_map, savedPath)
         }
     }
 
@@ -436,9 +458,9 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         updateTaskMap(loadedMap, runAutoLayout = autoAdjustLayoutState.value)
         val hasSavedRoute = bestRouteState.value.isNotEmpty()
         statusMessageState.value = if (hasSavedRoute) {
-            "Loaded \"$fileName\" with saved best route (${formatKm(bestRouteState.value.length)} km)."
+            UiText(Res.string.status_loaded_file_with_route, fileName, formatKm(bestRouteState.value.length))
         } else {
-            "Loaded \"$fileName\"."
+            UiText(Res.string.status_loaded_file, fileName)
         }
     }
 
@@ -457,7 +479,7 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         val validation = currentMap.validate()
         validationState.value = validation
         if (!validation.isValidForSimulation) {
-            statusMessageState.value = "Cannot start solver: please fix graph validation errors first."
+            statusMessageState.value = UiText(Res.string.status_cannot_start_invalid)
             return false
         }
 
@@ -484,7 +506,7 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
 
         // Use previous solution's best route as starting point if valid for this graph
         val previousBest = bestRouteState.value.takeIf { it.isNotEmpty() }
-            ?: currentMap.validateSavedRoute()
+                           ?: currentMap.validateSavedRoute()
 
         simulation = Simulation(
             graph = cityGraph,
@@ -504,9 +526,9 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         }
         simStatusState.value = SimulationStatus.NOT_STARTED
         statusMessageState.value = if (previousBest.isNotEmpty()) {
-            "Initialized solver warm-started from previous best route (${formatKm(previousBest.length)} km)."
+            UiText(Res.string.status_init_warm_start, formatKm(previousBest.length))
         } else {
-            "Initialized solver ($antsAmount ants, $ages ages)."
+            UiText(Res.string.status_init_solver, antsAmount, ages)
         }
         return true
     }
@@ -535,9 +557,9 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         simStatusState.value = newStatus
         if (finished) {
             statusMessageState.value = if (sim.bestRouteSoFar.isNotEmpty()) {
-                "Finished! Optimal route length: ${formatKm(sim.bestRouteSoFar.length)} km."
+                UiText(Res.string.status_finished_optimal, formatKm(sim.bestRouteSoFar.length))
             } else {
-                "Finished, but ants could not find a complete Hamiltonian cycle on this graph."
+                UiText(Res.string.status_finished_no_cycle)
             }
         }
         return newStatus
@@ -554,8 +576,8 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         for (i in ordered.indices) {
             val fromIdx = ordered[i]
             val toIdx = ordered[(i + 1) % ordered.size]
-            val fromName = current.cities.getOrNull(fromIdx)?.name ?: "City #$fromIdx"
-            val toName = current.cities.getOrNull(toIdx)?.name ?: "City #$toIdx"
+            val fromName = current.cities.getOrNull(fromIdx)?.name ?: "#$fromIdx"
+            val toName = current.cities.getOrNull(toIdx)?.name ?: "#$toIdx"
             val dist = current.roadLengthsKm[Road(fromIdx, toIdx)] ?: 0f
             cumulative += dist
             legs.add(
@@ -567,7 +589,7 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
                     toCityName = toName,
                     distanceKm = dist,
                     cumulativeKm = cumulative,
-                )
+                ),
             )
         }
         return legs

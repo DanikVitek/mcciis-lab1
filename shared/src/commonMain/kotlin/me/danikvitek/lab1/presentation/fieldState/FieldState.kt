@@ -56,9 +56,8 @@ fun <T : Any> ValidatedField(
         isError = state.value == null,
         supportingText = {
             if (state.value == null) {
-                Text(state.constraint.message)
+                Text(state.constraint.localizedMessage())
             }
         },
     )
 }
-

@@ -7,6 +7,8 @@ import me.danikvitek.lab1.domain.layout.GraphLayoutEngine
 import me.danikvitek.lab1.domain.model.NamedCity
 import me.danikvitek.lab1.domain.model.Road
 import me.danikvitek.lab1.domain.model.TaskMap
+import me.danikvitek.lab1.util.AppLanguage
+import me.danikvitek.lab1.util.AppLocaleManager
 
 expect object MapFileStorage {
     fun saveMapWithDialog(map: TaskMap): String?
@@ -14,101 +16,109 @@ expect object MapFileStorage {
 }
 
 object MapPresets {
-    val ukrainianCities: TaskMap by lazy {
-        val rawCities = listOf(
-            NamedCity("Kyiv", Offset(0.48f, 0.30f)),
-            NamedCity("Zhytomyr", Offset(0.34f, 0.32f)),
-            NamedCity("Vinnytsia", Offset(0.35f, 0.48f)),
-            NamedCity("Lviv", Offset(0.10f, 0.38f)),
-            NamedCity("Odesa", Offset(0.46f, 0.85f)),
-            NamedCity("Dnipro", Offset(0.75f, 0.56f)),
-            NamedCity("Kharkiv", Offset(0.85f, 0.34f)),
-            NamedCity("Poltava", Offset(0.70f, 0.38f)),
-        )
-        // Indices: 0=Kyiv, 1=Zhytomyr, 2=Vinnytsia, 3=Lviv, 4=Odesa, 5=Dnipro, 6=Kharkiv, 7=Poltava
-        val roads = mapOf(
-            Road(0, 1) to 140f,
-            Road(0, 2) to 268f,
-            Road(0, 4) to 475f,
-            Road(0, 5) to 477f,
-            Road(0, 6) to 480f,
-            Road(0, 7) to 342f,
-            Road(1, 2) to 128f,
-            Road(1, 3) to 400f,
-            Road(2, 3) to 369f,
-            Road(2, 4) to 429f,
-            Road(3, 4) to 790f,
-            Road(4, 5) to 454f,
-            Road(4, 7) to 590f,
-            Road(5, 6) to 218f,
-            Road(5, 7) to 185f,
-            Road(6, 7) to 143f,
-            Road(2, 5) to 570f,
-            Road(1, 7) to 480f,
-        )
-        TaskMap(
-            name = "Ukraine Major Cities",
-            cities = GraphLayoutEngine.adjustPositions(rawCities, roads),
-            roadLengthsKm = roads,
-            startCityIndex = 0,
-        )
-    }
+    private val isUk: Boolean
+        get() = AppLocaleManager.currentLanguage.value == AppLanguage.UKRAINIAN
 
-    val completeLogistics6: TaskMap by lazy {
-        val rawCities = listOf(
-            NamedCity("Depot Alpha", Offset(0.20f, 0.25f)),
-            NamedCity("North Hub", Offset(0.50f, 0.12f)),
-            NamedCity("East Terminal", Offset(0.84f, 0.32f)),
-            NamedCity("South Port", Offset(0.76f, 0.78f)),
-            NamedCity("Central Station", Offset(0.45f, 0.52f)),
-            NamedCity("West Outpost", Offset(0.16f, 0.72f)),
-        )
-        val roads = mutableMapOf<Road, Float>()
-        for (i in rawCities.indices) {
-            for (j in i + 1..<rawCities.size) {
-                val distKm = kotlin.math.round((rawCities[i].position - rawCities[j].position).getDistance() * 300f)
-                roads[Road(i, j)] = distKm.coerceAtLeast(10f)
-            }
+    val ukrainianCities: TaskMap
+        get() {
+            val uk = isUk
+            val rawCities = listOf(
+                NamedCity(if (uk) "Київ" else "Kyiv", Offset(0.48f, 0.30f)),
+                NamedCity(if (uk) "Житомир" else "Zhytomyr", Offset(0.34f, 0.32f)),
+                NamedCity(if (uk) "Вінниця" else "Vinnytsia", Offset(0.35f, 0.48f)),
+                NamedCity(if (uk) "Львів" else "Lviv", Offset(0.10f, 0.38f)),
+                NamedCity(if (uk) "Одеса" else "Odesa", Offset(0.46f, 0.85f)),
+                NamedCity(if (uk) "Дніпро" else "Dnipro", Offset(0.75f, 0.56f)),
+                NamedCity(if (uk) "Харків" else "Kharkiv", Offset(0.85f, 0.34f)),
+                NamedCity(if (uk) "Полтава" else "Poltava", Offset(0.70f, 0.38f)),
+            )
+            // Indices: 0=Kyiv, 1=Zhytomyr, 2=Vinnytsia, 3=Lviv, 4=Odesa, 5=Dnipro, 6=Kharkiv, 7=Poltava
+            val roads = mapOf(
+                Road(0, 1) to 140f,
+                Road(0, 2) to 268f,
+                Road(0, 4) to 475f,
+                Road(0, 5) to 477f,
+                Road(0, 6) to 480f,
+                Road(0, 7) to 342f,
+                Road(1, 2) to 128f,
+                Road(1, 3) to 400f,
+                Road(2, 3) to 369f,
+                Road(2, 4) to 429f,
+                Road(3, 4) to 790f,
+                Road(4, 5) to 454f,
+                Road(4, 7) to 590f,
+                Road(5, 6) to 218f,
+                Road(5, 7) to 185f,
+                Road(6, 7) to 143f,
+                Road(2, 5) to 570f,
+                Road(1, 7) to 480f,
+            )
+            return TaskMap(
+                name = if (uk) "Обласні центри України" else "Ukraine Major Cities",
+                cities = GraphLayoutEngine.adjustPositions(rawCities, roads),
+                roadLengthsKm = roads,
+                startCityIndex = 0,
+            )
         }
-        TaskMap(
-            name = "6-City Logistics Network",
-            cities = GraphLayoutEngine.adjustPositions(rawCities, roads),
-            roadLengthsKm = roads,
-            startCityIndex = 0,
-        )
-    }
 
-    val regionalRing5: TaskMap by lazy {
-        val rawCities = listOf(
-            NamedCity("Alpha", Offset(0.50f, 0.15f)),
-            NamedCity("Bravo", Offset(0.85f, 0.40f)),
-            NamedCity("Charlie", Offset(0.72f, 0.82f)),
-            NamedCity("Delta", Offset(0.28f, 0.82f)),
-            NamedCity("Echo", Offset(0.15f, 0.40f)),
-        )
-        val roads = mapOf(
-            Road(0, 1) to 95f,
-            Road(1, 2) to 110f,
-            Road(2, 3) to 120f,
-            Road(3, 4) to 110f,
-            Road(4, 0) to 95f,
-            Road(0, 2) to 180f,
-            Road(0, 3) to 180f,
-            Road(1, 3) to 195f,
-            Road(1, 4) to 165f,
-            Road(2, 4) to 195f,
-        )
-        TaskMap(
-            name = "5-City Symmetric Pentagon",
-            cities = GraphLayoutEngine.adjustPositions(rawCities, roads),
-            roadLengthsKm = roads,
-            startCityIndex = 0,
-        )
-    }
+    val completeLogistics6: TaskMap
+        get() {
+            val uk = isUk
+            val rawCities = listOf(
+                NamedCity(if (uk) "База Альфа" else "Depot Alpha", Offset(0.20f, 0.25f)),
+                NamedCity(if (uk) "Північний хаб" else "North Hub", Offset(0.50f, 0.12f)),
+                NamedCity(if (uk) "Східний термінал" else "East Terminal", Offset(0.84f, 0.32f)),
+                NamedCity(if (uk) "Південний порт" else "South Port", Offset(0.76f, 0.78f)),
+                NamedCity(if (uk) "Центральна станція" else "Central Station", Offset(0.45f, 0.52f)),
+                NamedCity(if (uk) "Західний форпост" else "West Outpost", Offset(0.16f, 0.72f)),
+            )
+            val roads = mutableMapOf<Road, Float>()
+            for (i in rawCities.indices) {
+                for (j in i + 1..<rawCities.size) {
+                    val distKm = kotlin.math.round((rawCities[i].position - rawCities[j].position).getDistance() * 300f)
+                    roads[Road(i, j)] = distKm.coerceAtLeast(10f)
+                }
+            }
+            return TaskMap(
+                name = if (uk) "Логістична мережа (6 міст)" else "6-City Logistics Network",
+                cities = GraphLayoutEngine.adjustPositions(rawCities, roads),
+                roadLengthsKm = roads,
+                startCityIndex = 0,
+            )
+        }
 
-    val all: List<TaskMap> by lazy {
-        listOf(ukrainianCities, completeLogistics6, regionalRing5)
-    }
+    val regionalRing5: TaskMap
+        get() {
+            val uk = isUk
+            val rawCities = listOf(
+                NamedCity(if (uk) "Альфа" else "Alpha", Offset(0.50f, 0.15f)),
+                NamedCity(if (uk) "Браво" else "Bravo", Offset(0.85f, 0.40f)),
+                NamedCity(if (uk) "Чарлі" else "Charlie", Offset(0.72f, 0.82f)),
+                NamedCity(if (uk) "Дельта" else "Delta", Offset(0.28f, 0.82f)),
+                NamedCity(if (uk) "Ехо" else "Echo", Offset(0.15f, 0.40f)),
+            )
+            val roads = mapOf(
+                Road(0, 1) to 95f,
+                Road(1, 2) to 110f,
+                Road(2, 3) to 120f,
+                Road(3, 4) to 110f,
+                Road(4, 0) to 95f,
+                Road(0, 2) to 180f,
+                Road(0, 3) to 180f,
+                Road(1, 3) to 195f,
+                Road(1, 4) to 165f,
+                Road(2, 4) to 195f,
+            )
+            return TaskMap(
+                name = if (uk) "Симетричний п’ятикутник (5 міст)" else "5-City Symmetric Pentagon",
+                cities = GraphLayoutEngine.adjustPositions(rawCities, roads),
+                roadLengthsKm = roads,
+                startCityIndex = 0,
+            )
+        }
+
+    val all: List<TaskMap>
+        get() = listOf(ukrainianCities, completeLogistics6, regionalRing5)
 }
 
 @Serializable

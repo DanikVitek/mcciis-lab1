@@ -1,6 +1,8 @@
 package me.danikvitek.lab1.data
 
 import me.danikvitek.lab1.domain.model.TaskMap
+import me.danikvitek.lab1.util.AppLanguage
+import me.danikvitek.lab1.util.AppLocaleManager
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
@@ -23,7 +25,12 @@ actual object MapFileStorage {
             .lowercase()
             .ifBlank { "custom-map" }
 
-        val dialog = FileDialog(null as Frame?, "Save City Map & Solution", FileDialog.SAVE).apply {
+        val title = if (AppLocaleManager.currentLanguage.value == AppLanguage.UKRAINIAN) {
+            "Зберегти карту міст та маршрут"
+        } else {
+            "Save City Map & Solution"
+        }
+        val dialog = FileDialog(null as Frame?, title, FileDialog.SAVE).apply {
             directory = mapsDir.absolutePath
             file = "$sanitized.json"
             filenameFilter = FilenameFilter { _, name -> name.endsWith(".json", ignoreCase = true) }
@@ -41,7 +48,12 @@ actual object MapFileStorage {
 
     actual fun loadMapWithDialog(): Pair<TaskMap, String>? {
         val mapsDir = ensureMapsDir()
-        val dialog = FileDialog(null as Frame?, "Load City Map", FileDialog.LOAD).apply {
+        val title = if (AppLocaleManager.currentLanguage.value == AppLanguage.UKRAINIAN) {
+            "Завантажити карту міст"
+        } else {
+            "Load City Map"
+        }
+        val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD).apply {
             directory = mapsDir.absolutePath
             filenameFilter = FilenameFilter { _, name -> name.endsWith(".json", ignoreCase = true) }
             isVisible = true
