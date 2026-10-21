@@ -1,12 +1,19 @@
 package me.danikvitek.lab1.domain.model
 
 class CyclicRoute internal constructor(cities: List<Int> = emptyList(), val length: Float = Float.POSITIVE_INFINITY) :
-        Collection<Int> {
-    val cities = run {
-        if (cities.isEmpty()) return@run cities
+        Collection<Road> {
+    init {
+        require(cities.isEmpty() || cities.size >= 2)
+    }
+
+    val cities by lazy {
+        if (cities.isEmpty()) return@lazy cities
 
         // Find the minimum city index
-        val minIndex = cities.indices.minByOrNull { cities[it] }?.takeUnless { it == 0 } ?: return@run cities
+        val minIndex = cities.indices
+                           .minByOrNull { cities[it] }
+                           ?.takeUnless { it == 0 }
+                       ?: return@lazy cities
 
         buildList(cities.size) {
             // Create a new list with the normalized cities
@@ -14,6 +21,13 @@ class CyclicRoute internal constructor(cities: List<Int> = emptyList(), val leng
                 add(cities[(minIndex + i) % cities.size])
             }
         }
+    }
+
+    val roads by lazy {
+        if (this.cities.isEmpty())
+            emptySet()
+        else
+            this.cities.asSequence().plusElement(this.cities[0]).zipWithNext().map(::Road).toSet()
     }
 
     override fun equals(other: Any?): Boolean {
@@ -38,26 +52,14 @@ class CyclicRoute internal constructor(cities: List<Int> = emptyList(), val leng
 
     override val size by this.cities::size
 
-    override fun isEmpty() = this.cities.isEmpty()
+    override fun isEmpty() = cities.isEmpty()
 
-    override fun contains(element: Int) = this.cities.contains(element)
+    override fun contains(element: Road) = roads.contains(element)
 
-    override fun iterator() = object : IntIterator() {
-        private var inner = cities.iterator()
-
-        override fun nextInt(): Int {
-            if (!hasNext()) throw NoSuchElementException("empty")
-            if (!inner.hasNext()) {
-                inner = cities.iterator()
-            }
-            return inner.next()
-        }
-
-        override fun hasNext() = !isEmpty()
-    }
+    override fun iterator() = roads.iterator()
 
     /** Returns a list iterator in case one needs to iterate over the route only once. */
-    fun listIterator() = cities.listIterator()
+    fun citiesIterator() = cities.listIterator()
 
-    override fun containsAll(elements: Collection<Int>) = cities.containsAll(elements)
+    override fun containsAll(elements: Collection<Road>) = roads.containsAll(elements)
 }

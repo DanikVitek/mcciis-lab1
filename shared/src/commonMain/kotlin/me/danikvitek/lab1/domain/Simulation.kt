@@ -1,16 +1,16 @@
 package me.danikvitek.lab1.domain
 
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.SendChannel
 import me.danikvitek.lab1.domain.model.*
 import me.danikvitek.lab1.util.treeFold
+import kotlin.math.ceil
 import kotlin.random.Random
 
 class Simulation(
-    private val bestRouteChannel: SendChannel<CyclicRoute>,
     val graph: CityGraph,
+    private val ages: Int,
     val antsAmount: Int = graph.cities.size,
-    private val ages: Int = 50,
+    eliteAntsFraction: Float = 0f,
     private val weightingConfig: WeightingConfig = weightingConfig {},
     private val rng: Random = Random.Default,
 ) {
@@ -19,24 +19,37 @@ class Simulation(
         require(antsAmount > 0) { "Ants amount must be greater than 0" }
     }
 
+    val eliteAntsAmount = ceil(antsAmount * eliteAntsFraction).toInt()
     val ants: Collection<Ant>
         field = distributedAnts().toCollection(ArrayList(antsAmount))
 
     private fun distributedAnts() = sequence {
-        repeat(antsAmount / graph.cities.size) {
+        val citiesAmount by graph.cities::size
+        var eliteAntsLeft = eliteAntsAmount
+        repeat(antsAmount / citiesAmount) {
             graph.cities
                 .indices
                 .shuffled(rng)
                 .asSequence()
-                .map(::Ant)
+                .map {
+                    Ant(
+                        startPosition = it,
+                        isElite = eliteAntsLeft-- > 0,
+                    )
+                }
                 .let { yieldAll(it) }
         }
         graph.cities
             .indices
             .shuffled(rng)
+            .subList(0, antsAmount % citiesAmount)
             .asSequence()
-            .take(antsAmount % graph.cities.size)
-            .map(::Ant)
+            .map {
+                Ant(
+                    startPosition = it,
+                    isElite = eliteAntsLeft-- > 0,
+                )
+            }
             .let { yieldAll(it) }
     }
 
@@ -51,8 +64,8 @@ class Simulation(
                 val accessibleCities = graph.roads.accessibleCities(it.position).keys
                 it.canReturnToStart(accessibleCities)
             } // some routes may be incomplete, so we don't want to deposit pheromones for them
-            .flatMap {
-                val routeRoads: Set<Road> = (it.visited.asSequence() + it.position + it.startPosition)
+            .flatMap { ant ->
+                val routeRoads: Set<Road> = (ant.visited.asSequence() + ant.position + ant.startPosition)
                     .zipWithNext()
                     .map(::Road)
                     .toSet()
@@ -60,7 +73,14 @@ class Simulation(
                     .map { (from, to) -> (graph.cities[from] - graph.cities[to]).getDistance() }
                     .reduce { acc, distance -> acc + distance }
                 routeRoads
-                    .associateWith { weightingConfig.pheromoneDepositMultiplier / routeLength }
+                    .associateWith { road ->
+                        if (ant.isElite)
+                            if (road in bestRouteSoFar)
+                                weightingConfig.pheromoneDepositMultiplier / bestRouteSoFar.length
+                            else 0f
+                        else
+                            weightingConfig.pheromoneDepositMultiplier / routeLength
+                    }
                     .asSequence()
             }
             .groupingBy { it.key }
@@ -78,7 +98,7 @@ class Simulation(
     var currentAge = 0
         private set
 
-    var bestLengthSoFar = Float.POSITIVE_INFINITY
+    var bestRouteSoFar = CyclicRoute()
         private set
 
     private var coroutine: CoroutineScope? = null
@@ -140,9 +160,8 @@ class Simulation(
                 updatePheromones()
             }
 
-            if (bestLengthInGeneration < bestLengthSoFar) {
-                bestLengthSoFar = bestLengthInGeneration
-                bestRouteChannel.send(CyclicRoute(bestRouteInGeneration!!, bestLengthInGeneration))
+            if (bestLengthInGeneration < bestRouteSoFar.length) {
+                bestRouteSoFar = CyclicRoute(bestRouteInGeneration!!, bestLengthInGeneration)
             }
 
             updateJob.join()
