@@ -57,23 +57,26 @@ fun ExperimentRunnerScreen(
             .safeDrawingPadding()
             .then(Modifier.padding(16.dp)),
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Column(
-            modifier = Modifier,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(text = "Canvas")
-                Switch(
-                    checked = canvasOrPlot == CanvasOrPlot.PLOT,
-                    onCheckedChange = { canvasOrPlot = if (it) CanvasOrPlot.PLOT else CanvasOrPlot.CANVAS },
+            PrimaryTabRow(selectedTabIndex = canvasOrPlot.ordinal) {
+                Tab(
+                    selected = canvasOrPlot == CanvasOrPlot.CANVAS,
+                    onClick = { canvasOrPlot = CanvasOrPlot.CANVAS },
+                    text = { Text("Graph") },
                 )
-                Text("Plot")
+                Tab(
+                    selected = canvasOrPlot == CanvasOrPlot.PLOT,
+                    onClick = { canvasOrPlot = CanvasOrPlot.PLOT },
+                    text = { Text("Plot") },
+                )
             }
             when (canvasOrPlot) {
                 CanvasOrPlot.CANVAS ->

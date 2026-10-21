@@ -93,29 +93,42 @@ fun TaskSolverScreen(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            // Left: Interactive Canvas & Toolbars
+            // Left: Graph & Plot Tabs + Interactive Canvas
             Column(
                 modifier = Modifier
                     .weight(1.15f)
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                CanvasToolbar(
-                    activeTool = activeTool,
-                    selectedCityName = selectedCityIndex?.let { taskMap.cities.getOrNull(it)?.name },
-                    onSelectTool = viewModel::setTool,
-                    autoAdjustLayout = autoAdjustLayout,
-                    onToggleAutoAdjust = viewModel::setAutoAdjustLayout,
-                    onAdjustLayoutNow = viewModel::adjustLayoutNow,
-                    showPheromones = showPheromones,
-                    onTogglePheromones = { showPheromones = it },
-                    showBestRoute = showBestRoute,
-                    onToggleBestRoute = { showBestRoute = it },
-                    showRoadLengths = showRoadLengths,
-                    onToggleRoadLengths = { showRoadLengths = it },
-                    canvasOrPlot = canvasOrPlot,
-                    onToggleCanvasOrPlot = { canvasOrPlot = it },
-                )
+                PrimaryTabRow(selectedTabIndex = canvasOrPlot.ordinal) {
+                    Tab(
+                        selected = canvasOrPlot == CanvasOrPlot.CANVAS,
+                        onClick = { canvasOrPlot = CanvasOrPlot.CANVAS },
+                        text = { Text("Graph") },
+                    )
+                    Tab(
+                        selected = canvasOrPlot == CanvasOrPlot.PLOT,
+                        onClick = { canvasOrPlot = CanvasOrPlot.PLOT },
+                        text = { Text("Plot") },
+                    )
+                }
+
+                if (canvasOrPlot == CanvasOrPlot.CANVAS) {
+                    CanvasToolbar(
+                        activeTool = activeTool,
+                        selectedCityName = selectedCityIndex?.let { taskMap.cities.getOrNull(it)?.name },
+                        onSelectTool = viewModel::setTool,
+                        autoAdjustLayout = autoAdjustLayout,
+                        onToggleAutoAdjust = viewModel::setAutoAdjustLayout,
+                        onAdjustLayoutNow = viewModel::adjustLayoutNow,
+                        showPheromones = showPheromones,
+                        onTogglePheromones = { showPheromones = it },
+                        showBestRoute = showBestRoute,
+                        onToggleBestRoute = { showBestRoute = it },
+                        showRoadLengths = showRoadLengths,
+                        onToggleRoadLengths = { showRoadLengths = it },
+                    )
+                }
 
                 Box(
                     modifier = Modifier
@@ -198,7 +211,8 @@ fun TaskSolverScreen(
                         selected = activeRightTab == 1,
                         onClick = { activeRightTab = 1 },
                         text = {
-                            val badge = if (bestRoute.isNotEmpty()) " • ${TaskSolverViewModel.formatKm(bestRoute.length)} km" else ""
+                            val badge =
+                                if (bestRoute.isNotEmpty()) " • ${TaskSolverViewModel.formatKm(bestRoute.length)} km" else ""
                             Text("2. Task Solver & Route$badge")
                         },
                     )
@@ -344,8 +358,6 @@ private fun CanvasToolbar(
     onToggleBestRoute: (Boolean) -> Unit,
     showRoadLengths: Boolean,
     onToggleRoadLengths: (Boolean) -> Unit,
-    canvasOrPlot: CanvasOrPlot,
-    onToggleCanvasOrPlot: (CanvasOrPlot) -> Unit,
 ) {
     Surface(
         tonalElevation = 1.dp,
@@ -393,6 +405,7 @@ private fun CanvasToolbar(
                 } else {
                     "Hint: Click the first city on the canvas, then click a second city to create a road."
                 }
+
                 EditorTool.DELETE -> "Hint: Click any city node or road segment on the canvas to delete it."
             }
             Text(
@@ -421,17 +434,6 @@ private fun CanvasToolbar(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = showBestRoute, onCheckedChange = onToggleBestRoute)
                     Text("Best route", style = MaterialTheme.typography.bodySmall)
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text("Map", style = MaterialTheme.typography.bodySmall)
-                    Switch(
-                        checked = canvasOrPlot == CanvasOrPlot.PLOT,
-                        onCheckedChange = { onToggleCanvasOrPlot(if (it) CanvasOrPlot.PLOT else CanvasOrPlot.CANVAS) },
-                    )
-                    Text("Plot", style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -536,9 +538,9 @@ private fun InteractiveGraphCanvas(
                                 val roadHitThreshold = 14.dp.toPx()
                                 val hitRoad = currentTaskMap.roadLengthsKm.keys.firstOrNull { road ->
                                     val p1 = cities.getOrNull(road.city1)?.position?.let(transform::toCanvas)
-                                        ?: return@firstOrNull false
+                                             ?: return@firstOrNull false
                                     val p2 = cities.getOrNull(road.city2)?.position?.let(transform::toCanvas)
-                                        ?: return@firstOrNull false
+                                             ?: return@firstOrNull false
                                     distanceToSegment(tapOffset, p1, p2) <= roadHitThreshold
                                 }
                                 if (hitRoad != null) {
@@ -625,11 +627,27 @@ private fun InteractiveGraphCanvas(
                         brush = Brush.linearGradient(
                             colors = listOf(
                                 Color.Transparent,
-                                lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.0625f.pow(1f / intensity)), intensity),
-                                lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.25f.pow(1f / intensity)), intensity),
+                                lerp(
+                                    Color.Blue.copy(alpha = 0f),
+                                    Color.Red.copy(alpha = 0.0625f.pow(1f / intensity)),
+                                    intensity,
+                                ),
+                                lerp(
+                                    Color.Blue.copy(alpha = 0f),
+                                    Color.Red.copy(alpha = 0.25f.pow(1f / intensity)),
+                                    intensity,
+                                ),
                                 lerp(Color.Blue.copy(alpha = 0f), Color.Red, intensity),
-                                lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.25f.pow(1f / intensity)), intensity),
-                                lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.0625f.pow(1f / intensity)), intensity),
+                                lerp(
+                                    Color.Blue.copy(alpha = 0f),
+                                    Color.Red.copy(alpha = 0.25f.pow(1f / intensity)),
+                                    intensity,
+                                ),
+                                lerp(
+                                    Color.Blue.copy(alpha = 0f),
+                                    Color.Red.copy(alpha = 0.0625f.pow(1f / intensity)),
+                                    intensity,
+                                ),
                                 Color.Transparent,
                             ),
                             start = brushStart,
@@ -825,7 +843,8 @@ private fun ValidationBanner(
                     )
                 }
                 if (validation.lowDegreeCities.isNotEmpty()) {
-                    val names = validation.lowDegreeCities.mapNotNull { taskMap.cities.getOrNull(it)?.name }.joinToString(", ")
+                    val names =
+                        validation.lowDegreeCities.mapNotNull { taskMap.cities.getOrNull(it)?.name }.joinToString(", ")
                     val minRoads = if (taskMap.cities.size == 2) 1 else 2
                     Text(
                         text = "• Each city needs at least $minRoads road(s) for a cyclic tour. Check: $names",
@@ -845,7 +864,11 @@ private fun ValidationBanner(
                         val nameB = taskMap.cities.getOrNull(v.cityB)?.name ?: "#${v.cityB}"
                         val nameC = taskMap.cities.getOrNull(v.cityC)?.name ?: "#${v.cityC}"
                         Text(
-                            text = "   $nameA ↔ $nameB (${TaskSolverViewModel.formatKm(v.directLengthKm)} km) > $nameA → $nameC → $nameB (${TaskSolverViewModel.formatKm(v.indirectLengthKm)} km)",
+                            text = "   $nameA ↔ $nameB (${TaskSolverViewModel.formatKm(v.directLengthKm)} km) > $nameA → $nameC → $nameB (${
+                                TaskSolverViewModel.formatKm(
+                                    v.indirectLengthKm,
+                                )
+                            } km)",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                         )
