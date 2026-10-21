@@ -93,11 +93,7 @@ class SimulationViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
                     simulation!!.graph.let {
                         CityGraph(
                             cities = it.cities,
-                            roads = MutableRoads(
-                                it.roads.asSequence().associateTo(mutableMapOf()) { entry ->
-                                    entry.key to initialPheromoneLevel
-                                },
-                            ),
+                            roads = it.mutableRoads.resetAllPheromones(initialPheromoneLevel),
                         )
                     }
                 else

@@ -2,7 +2,7 @@ package me.danikvitek.lab1.domain
 
 import kotlinx.coroutines.*
 import me.danikvitek.lab1.domain.model.*
-import me.danikvitek.lab1.util.treeFold
+import me.danikvitek.lab1.util.treeReduceOrNull
 import kotlin.math.ceil
 import kotlin.random.Random
 
@@ -20,79 +20,119 @@ class Simulation(
     }
 
     val eliteAntsAmount = ceil(antsAmount * eliteAntsFraction).toInt()
-    val ants: Collection<Ant>
-        field = distributedAnts().toCollection(ArrayList(antsAmount))
 
-    private fun distributedAnts() = sequence {
-        val citiesAmount by graph.cities::size
-        var eliteAntsLeft = eliteAntsAmount
-        repeat(antsAmount / citiesAmount) {
-            graph.cities
-                .indices
-                .shuffled(rng)
-                .asSequence()
-                .map {
-                    Ant(
-                        startPosition = it,
-                        isElite = eliteAntsLeft-- > 0,
-                    )
+    private val shuffledCityIndices = IntArray(graph.cities.size) { it }
+    private val pheromoneDeltas = FloatArray(graph.edgesCount)
+    private val antCoroutineNames = Array(antsAmount) { CoroutineName("ant-$it") }
+    private val antJobs = ArrayList<Deferred<Ant?>>(antsAmount)
+
+    val ants: Collection<Ant>
+        field = ArrayList<Ant>(antsAmount).apply {
+            val citiesAmount = graph.cities.size
+            var cityCursor = citiesAmount
+            for (i in 0..<antsAmount) {
+                if (cityCursor >= citiesAmount) {
+                    shuffledCityIndices.shuffle(rng)
+                    cityCursor = 0
                 }
-                .let { yieldAll(it) }
-        }
-        graph.cities
-            .indices
-            .shuffled(rng)
-            .subList(0, antsAmount % citiesAmount)
-            .asSequence()
-            .map {
-                Ant(
-                    startPosition = it,
-                    isElite = eliteAntsLeft-- > 0,
+                add(
+                    Ant(
+                        startPosition = shuffledCityIndices[cityCursor++],
+                        isElite = i < eliteAntsAmount,
+                        initialCapacity = citiesAmount,
+                    )
                 )
             }
-            .let { yieldAll(it) }
-    }
+        }
 
     private fun resetAnts() {
-        val distributedAnts = distributedAnts().iterator()
-        ants.replaceAll { distributedAnts.next() }
+        val citiesAmount = graph.cities.size
+        var cityCursor = citiesAmount
+        for (i in 0..<antsAmount) {
+            if (cityCursor >= citiesAmount) {
+                shuffledCityIndices.shuffle(rng)
+                cityCursor = 0
+            }
+            ants[i].reset(
+                newStartPosition = shuffledCityIndices[cityCursor++],
+                newIsElite = i < eliteAntsAmount,
+            )
+        }
     }
 
     private suspend fun updatePheromones() {
-        val pheromoneDeltas = ants.asSequence()
-            .filter {
-                val accessibleCities = graph.roads.accessibleCities(it.position).keys
-                it.canReturnToStart(accessibleCities)
-            } // some routes may be incomplete, so we don't want to deposit pheromones for them
-            .flatMap { ant ->
-                val routeRoads: Set<Road> = (ant.visited.asSequence() + ant.position + ant.startPosition)
-                    .zipWithNext()
-                    .map(::Road)
-                    .toSet()
-                val routeLength: Float = routeRoads
-                    .map { (from, to) -> (graph.cities[from] - graph.cities[to]).getDistance() }
-                    .reduce { acc, distance -> acc + distance }
-                routeRoads
-                    .associateWith { road ->
-                        if (ant.isElite)
-                            if (road in bestRouteSoFar)
-                                weightingConfig.pheromoneDepositMultiplier / bestRouteSoFar.length
-                            else 0f
-                        else
-                            weightingConfig.pheromoneDepositMultiplier / routeLength
-                    }
-                    .asSequence()
-            }
-            .groupingBy { it.key }
-            .aggregate { _, acc: Float?, entry, first ->
-                yield()
-                if (first) entry.value else entry.value + acc!!
-            }
+        val deltas = pheromoneDeltas
+        deltas.fill(0f)
 
-        graph.mutableRoads.replaceAll { road, oldValue ->
-            weightingConfig.pheromoneEvaporationRate * oldValue +
-            pheromoneDeltas.getOrDefault(road, 0f)
+        val qValue = weightingConfig.pheromoneDepositMultiplier
+        val bestRoute = bestRouteSoFar
+        val edgeDistances = graph.edgeDistances
+
+        for (antIndex in ants.indices) {
+            val ant = ants[antIndex]
+            val pos = ant.position
+            val start = ant.startPosition
+            // Some routes may be incomplete, so we don't want to deposit pheromones for them
+            if (!graph.hasRoad(pos, start)) continue
+
+            val visitedCount = ant.visitedCount
+            if (visitedCount == 0) continue
+            val visitedOrder = ant.visitedOrder
+
+            if (ant.isElite) {
+                if (bestRoute.isEmpty()) continue
+                val eliteDeposit = qValue / bestRoute.length
+                if (visitedCount == 1) {
+                    if (bestRoute.containsRoad(start, pos)) {
+                        deltas[graph.edgeIndex(start, pos)] += eliteDeposit
+                    }
+                } else {
+                    for (i in 0..<visitedCount - 1) {
+                        val u = visitedOrder[i]
+                        val v = visitedOrder[i + 1]
+                        if (bestRoute.containsRoad(u, v)) {
+                            deltas[graph.edgeIndex(u, v)] += eliteDeposit
+                        }
+                    }
+                    val lastVisited = visitedOrder[visitedCount - 1]
+                    if (bestRoute.containsRoad(lastVisited, pos)) {
+                        deltas[graph.edgeIndex(lastVisited, pos)] += eliteDeposit
+                    }
+                    if (bestRoute.containsRoad(pos, start)) {
+                        deltas[graph.edgeIndex(pos, start)] += eliteDeposit
+                    }
+                }
+            } else {
+                if (visitedCount == 1) {
+                    val edgeIdx = graph.edgeIndex(start, pos)
+                    val routeLength = edgeDistances[edgeIdx]
+                    deltas[edgeIdx] += qValue / routeLength
+                } else {
+                    var routeLength = ant.completedRouteLength
+                    if (routeLength == Float.POSITIVE_INFINITY) {
+                        var sum = 0f
+                        for (i in 0..<visitedCount - 1) {
+                            sum += edgeDistances[graph.edgeIndex(visitedOrder[i], visitedOrder[i + 1])]
+                        }
+                        sum += edgeDistances[graph.edgeIndex(visitedOrder[visitedCount - 1], pos)]
+                        sum += edgeDistances[graph.edgeIndex(pos, start)]
+                        routeLength = sum
+                    }
+                    val deposit = qValue / routeLength
+                    for (i in 0..<visitedCount - 1) {
+                        deltas[graph.edgeIndex(visitedOrder[i], visitedOrder[i + 1])] += deposit
+                    }
+                    deltas[graph.edgeIndex(visitedOrder[visitedCount - 1], pos)] += deposit
+                    deltas[graph.edgeIndex(pos, start)] += deposit
+                }
+            }
+            yield()
         }
+
+        graph.mutableRoads.updateAllPheromones(
+            evaporationRate = weightingConfig.pheromoneEvaporationRate,
+            deltas = deltas,
+        )
     }
 
     var currentAge = 0
@@ -110,61 +150,66 @@ class Simulation(
     suspend fun tick(): Boolean = context(rng, weightingConfig) {
         if (currentAge >= ages) return true
 
+        val citiesAmount = graph.cities.size
+        val neighborCities = graph.neighborCities
+        val neighborWeights = graph.neighborWeights
+
+        graph.refreshWeights(weightingConfig)
+
         withContext(Dispatchers.Default) {
             coroutine = this
-            val (bestLengthInGeneration, bestRouteInGeneration) = ants
-                .mapIndexed { index, ant ->
-                    async(CoroutineName("ant-$index")) {
+            antJobs.clear()
+            for ((index, ant) in ants.withIndex()) {
+                antJobs.add(
+                    async(antCoroutineNames[index]) {
                         do {
-                            val accessibleCities = graph.accessibleCities(ant.position)
-
-                            val stuckOrFinished = ant.chooseNext(accessibleCities) == Ant.ChoiceResult.STAYED
+                            val currentPos = ant.position
+                            val stuckOrFinished = ant.chooseNext(
+                                neighborCities[currentPos],
+                                neighborWeights[currentPos],
+                            ) == Ant.ChoiceResult.STAYED
                             val stuck = stuckOrFinished &&
-                                        (ant.cannotReturnToStart(accessibleCities.keys) ||
-                                         ant.visited.size + 1 < graph.cities.size)
+                                        (!graph.hasRoad(ant.position, ant.startPosition) ||
+                                         ant.visitedCount + 1 < citiesAmount)
                             if (stuck) {
                                 return@async null
                             }
                             yield()
                         } while (!stuckOrFinished)
 
-                        ant.visited
-                            .toCollection(ArrayList(ant.visited.size + 1))
-                            .apply { add(ant.position) }
-                    }
-                }
-                .treeFold(
-                    initial = { Float.POSITIVE_INFINITY to null },
-                    aggregateItem = { acc: Pair<Float, List<Int>?>, route: List<Int>? ->
-                        if (route == null) {
-                            return@treeFold acc
-                        }
-
+                        val visitedOrder = ant.visitedOrder
+                        val visitedCount = ant.visitedCount
                         var length = 0f
-                        route.forEachIndexed { index, city ->
-                            val nextCity = route[(index + 1) % route.size]
-                            length += (graph.cities[city] - graph.cities[nextCity]).getDistance()
+                        for (i in 0..<visitedCount - 1) {
+                            length += graph.distanceBetween(visitedOrder[i], visitedOrder[i + 1])
                         }
-                        length to route
-                    },
-                    aggregateAccumulators = { left: Pair<Float, List<Int>?>, right: Pair<Float, List<Int>?> ->
-                        if (left.first < right.first) {
-                            left
-                        } else {
-                            right
+                        if (visitedCount > 0) {
+                            length += graph.distanceBetween(visitedOrder[visitedCount - 1], ant.position)
                         }
-                    },
+                        length += graph.distanceBetween(ant.position, ant.startPosition)
+                        ant.completedRouteLength = length
+                        ant
+                    }
                 )
-
-            val updateJob = launch(CoroutineName("updatePheromones")) {
-                updatePheromones()
             }
 
-            if (bestLengthInGeneration < bestRouteSoFar.length) {
-                bestRouteSoFar = CyclicRoute(bestRouteInGeneration!!, bestLengthInGeneration)
+            val bestAntInGeneration = antJobs.treeReduceOrNull { left, right ->
+                when {
+                    left == null -> right
+                    right == null -> left
+                    left.completedRouteLength <= right.completedRouteLength -> left
+                    else -> right
+                }
             }
 
-            updateJob.join()
+            if (bestAntInGeneration != null && bestAntInGeneration.completedRouteLength < bestRouteSoFar.length) {
+                bestRouteSoFar = CyclicRoute(
+                    bestAntInGeneration.buildRouteList(),
+                    bestAntInGeneration.completedRouteLength,
+                )
+            }
+
+            updatePheromones()
         }
 
         resetAnts()

@@ -2,22 +2,26 @@ package me.danikvitek.lab1.domain.model
 
 
 @JvmInline
-value class Road private constructor(val packed: Long) : Set<Int> {
-    constructor(city1: Int, city2: Int) : this(
-        run {
+value class Road internal constructor(val packed: Long) : Set<Int> {
+    constructor(city1: Int, city2: Int) : this(pack(city1, city2))
+
+    constructor(cities: Pair<Int, Int>) : this(cities.first, cities.second)
+
+    companion object {
+        internal fun pack(city1: Int, city2: Int): Long {
             require(city1 >= 0) { "City index must be non-negative" }
             require(city2 >= 0) { "City index must be non-negative" }
             require(city1 != city2) { "A road cannot connect a city to itself" }
-            (maxOf(city1, city2).toLong() shl 32) or minOf(city1, city2).toLong()
+            val min = minOf(city1, city2).toLong() and 0xFFFFFFFFL
+            val max = maxOf(city1, city2).toLong()
+            return (max shl 32) or min
         }
-    )
-
-    constructor(cities: Pair<Int, Int>) : this(cities.first, cities.second)
+    }
 
     val city1
         get() = packed.toInt()
     val city2
-        get() = (packed shr 32).toInt()
+        get() = (packed ushr 32).toInt()
 
     operator fun component1() = city1
     operator fun component2() = city2

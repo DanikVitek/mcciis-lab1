@@ -3,7 +3,6 @@ package me.danikvitek.lab1.domain.model
 import androidx.compose.ui.geometry.Offset
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.mutate
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.sin
@@ -24,14 +23,22 @@ class CityGraph private constructor(
     init {
         if (validate) {
             require(cities.isNotEmpty()) { "Cities list cannot be empty" }
-            roads.keys.indexOfFirst { (city1, city2) -> city1 !in cities.indices || city2 !in cities.indices }.let {
-                require(it == -1) { "Roads cannot connect to non-existent cities (road #$it)" }
+            val n = cities.size
+            val hasRoadForCity = BooleanArray(n)
+            val packed = roads.packedRoads
+            for (i in 0..<roads.size) {
+                val road = packed[i]
+                val city1 = road.toInt()
+                val city2 = (road ushr 32).toInt()
+                require(city1 in 0..<n && city2 in 0..<n) {
+                    "Roads cannot connect to non-existent cities (road #$i)"
+                }
+                hasRoadForCity[city1] = true
+                hasRoadForCity[city2] = true
             }
-            cities.indices.find {
-                !(roads.keys.any { road -> it in road })
-            }.let {
-                require(it == null) {
-                    "No city can be isolated, or be a sink/source of roads (i.e., all cities must have at least one incoming and one outgoing road) (city #$it)"
+            for (city in 0..<n) {
+                require(hasRoadForCity[city]) {
+                    "No city can be isolated, or be a sink/source of roads (i.e., all cities must have at least one incoming and one outgoing road) (city #$city)"
                 }
             }
             // No way to quickly check if the graph is Hamiltonian
@@ -40,13 +47,7 @@ class CityGraph private constructor(
 
     companion object {
         fun fullyConnected(initialPheromoneLevel: Float, cities: List<Offset>): CityGraph {
-            val roads = MutableRoads().apply {
-                for (i in cities.indices) {
-                    for (j in i + 1..cities.lastIndex) {
-                        put(i, j, initialPheromoneLevel)
-                    }
-                }
-            }
+            val roads = MutableRoads(cities.size, initialPheromoneLevel)
             return CityGraph(cities, roads, validate = false)
         }
 
@@ -90,20 +91,135 @@ class CityGraph private constructor(
     internal val mutableRoads: MutableRoads = roads
     val roads: Roads by this::mutableRoads
 
-    private val invDistancesCache = ConcurrentHashMap<Road, Float>(roads.size)
+    internal val edgesCount: Int
+        get() = mutableRoads.size
+
+    internal val edgeDistances = FloatArray(mutableRoads.size)
+    internal val edgeInvDistances = FloatArray(mutableRoads.size)
+    private val edgeInvDistancesPowBeta = FloatArray(mutableRoads.size)
+    private var cachedBeta: Float = Float.NaN
+    private val edgeWeights = FloatArray(mutableRoads.size)
+
+    internal val neighborCities: Array<IntArray>
+    internal val neighborEdgeIndices: Array<IntArray>
+    internal val neighborWeights: Array<FloatArray>
+
+    init {
+        val n = cities.size
+        val m = mutableRoads.size
+        val packed = mutableRoads.packedRoads
+        val degrees = IntArray(n)
+
+        for (e in 0..<m) {
+            val road = packed[e]
+            val c1 = road.toInt()
+            val c2 = (road ushr 32).toInt()
+            val dist = (cities[c1] - cities[c2]).getDistance()
+            edgeDistances[e] = dist
+            edgeInvDistances[e] = 1f / dist
+            degrees[c1]++
+            degrees[c2]++
+        }
+
+        val adjCities = Array(n) { IntArray(degrees[it]) }
+        val adjEdges = Array(n) { IntArray(degrees[it]) }
+        val adjWeights = Array(n) { FloatArray(degrees[it]) }
+        val cursors = IntArray(n)
+
+        for (e in 0..<m) {
+            val road = packed[e]
+            val c1 = road.toInt()
+            val c2 = (road ushr 32).toInt()
+
+            val pos1 = cursors[c1]++
+            adjCities[c1][pos1] = c2
+            adjEdges[c1][pos1] = e
+
+            val pos2 = cursors[c2]++
+            adjCities[c2][pos2] = c1
+            adjEdges[c2][pos2] = e
+        }
+
+        neighborCities = adjCities
+        neighborEdgeIndices = adjEdges
+        neighborWeights = adjWeights
+    }
+
+    private fun ensureInvDistancesPowBeta(beta: Float): FloatArray {
+        val invDistBeta = edgeInvDistancesPowBeta
+        if (cachedBeta != beta) {
+            val invDist = edgeInvDistances
+            when (beta) {
+                0f -> invDistBeta.fill(1f)
+                1f -> invDist.copyInto(invDistBeta)
+                else -> for (e in invDist.indices) {
+                    invDistBeta[e] = invDist[e].pow(beta)
+                }
+            }
+            cachedBeta = beta
+        }
+        return invDistBeta
+    }
+
+    /**
+     * Precomputes transition weights for all edges and populates per-city adjacency weight arrays once per tick.
+     */
+    internal fun refreshWeights(weighting: WeightingConfig) {
+        val alpha = weighting.alpha
+        val invDistBeta = ensureInvDistancesPowBeta(weighting.beta)
+        val pheromones = mutableRoads.pheromones
+        val weights = edgeWeights
+        val m = edgesCount
+
+        when (alpha) {
+            0f -> invDistBeta.copyInto(weights, 0, 0, m)
+            1f -> for (e in 0..<m) {
+                weights[e] = pheromones[e] * invDistBeta[e]
+            }
+            else -> for (e in 0..<m) {
+                weights[e] = pheromones[e].pow(alpha) * invDistBeta[e]
+            }
+        }
+
+        for (u in cities.indices) {
+            val edgeIndices = neighborEdgeIndices[u]
+            val cityWeights = neighborWeights[u]
+            for (i in edgeIndices.indices) {
+                cityWeights[i] = weights[edgeIndices[i]]
+            }
+        }
+    }
+
+    internal fun hasRoad(city1: Int, city2: Int): Boolean {
+        if (city1 == city2) return false
+        val fcCount = mutableRoads.fullyConnectedCitiesCount
+        if (fcCount > 0) {
+            return city1 in 0..<fcCount && city2 in 0..<fcCount
+        }
+        return mutableRoads.indexOfCities(city1, city2) >= 0
+    }
+
+    internal fun edgeIndex(city1: Int, city2: Int): Int =
+        mutableRoads.indexOfCities(city1, city2)
+
+    internal fun distanceBetween(city1: Int, city2: Int): Float =
+        edgeDistances[mutableRoads.indexOfCities(city1, city2)]
 
     context(weighting: WeightingConfig)
     fun accessibleCities(from: Int): PersistentMap<Int, Float> {
         val nextCities: PersistentMap<Int, Float> = roads.accessibleCities(from)
-        val fromPosition: Offset = cities[from]
+        val invDistBeta = ensureInvDistancesPowBeta(weighting.beta)
+        val alpha = weighting.alpha
         return nextCities.mutate {
             it.replaceAll { to, pheromone ->
-                val distanceWeight = invDistancesCache.getOrPut(Road(from, to)) {
-                    1f / (fromPosition - cities[to]).getDistance()
+                val edgeIdx = mutableRoads.indexOfCities(from, to)
+                val distWeightPowBeta = if (edgeIdx >= 0) {
+                    invDistBeta[edgeIdx]
+                } else {
+                    (1f / (cities[from] - cities[to]).getDistance()).pow(weighting.beta)
                 }
 
-                pheromone.pow(weighting.alpha) *
-                distanceWeight.pow(weighting.beta)
+                pheromone.pow(alpha) * distWeightPowBeta
             }
         }
     }

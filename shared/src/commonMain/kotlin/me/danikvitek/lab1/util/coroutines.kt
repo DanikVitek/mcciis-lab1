@@ -15,22 +15,27 @@ suspend fun <T, R> List<Deferred<T>>.treeFold(
     initial: () -> R,
     aggregateItem: suspend (acc: R, item: T) -> R,
     aggregateAccumulators: suspend (left: R, right: R) -> R,
+): R = treeFoldRange(0, size, initial, aggregateItem, aggregateAccumulators)
+
+private suspend fun <T, R> List<Deferred<T>>.treeFoldRange(
+    fromIndex: Int,
+    toIndex: Int,
+    initial: () -> R,
+    aggregateItem: suspend (acc: R, item: T) -> R,
+    aggregateAccumulators: suspend (left: R, right: R) -> R,
 ): R {
-    return when (size) {
+    return when (val length = toIndex - fromIndex) {
         0 -> initial()
         1 -> aggregateItem(
             initial(),
-            this[0].await(),
+            this[fromIndex].await(),
         )
 
         else -> {
-            val mid = size / 2
-            val left = subList(0, mid)
-            val right = subList(mid, size)
-
+            val mid = fromIndex + (length ushr 1)
             aggregateAccumulators(
-                left.treeFold(initial, aggregateItem, aggregateAccumulators),
-                right.treeFold(initial, aggregateItem, aggregateAccumulators),
+                treeFoldRange(fromIndex, mid, initial, aggregateItem, aggregateAccumulators),
+                treeFoldRange(mid, toIndex, initial, aggregateItem, aggregateAccumulators),
             )
         }
     }
@@ -39,26 +44,7 @@ suspend fun <T, R> List<Deferred<T>>.treeFold(
 suspend fun <T, R : T> List<Deferred<T>>.treeFold(
     initial: () -> R,
     convolve: suspend (acc: R, item: T) -> R,
-): R {
-    return when (size) {
-        0 -> initial()
-        1 -> convolve(
-            initial(),
-            this[0].await(),
-        )
-
-        else -> {
-            val mid = size / 2
-            val left = subList(0, mid)
-            val right = subList(mid, size)
-
-            convolve(
-                left.treeFold(initial, convolve),
-                right.treeFold(initial, convolve),
-            )
-        }
-    }
-}
+): R = treeFoldRange(0, size, initial, convolve, convolve)
 
 /**
  * Reduces a list of deferred values into a single value using a tree-like structure.
@@ -75,7 +61,7 @@ suspend fun <T> List<Deferred<T>>.treeReduce(
     return when (size) {
         0 -> throw UnsupportedOperationException("Cannot reduce an empty list")
         1 -> this[0].await()
-        else -> treeReduce2(convolve)
+        else -> treeReduceRange(0, size, convolve)
     }
 }
 
@@ -85,23 +71,25 @@ suspend fun <T> List<Deferred<T>>.treeReduceOrNull(
     return when (size) {
         0 -> null
         1 -> this[0].await()
-        else -> treeReduce2(convolve)
+        else -> treeReduceRange(0, size, convolve)
     }
 }
 
 /**
  * Used to implement [treeReduce] and [treeReduceOrNull].
- * It assumes that the list has at least two elements.
+ * It assumes that the range has at least two elements.
  */
-private suspend fun <T> List<Deferred<T>>.treeReduce2(
+private suspend fun <T> List<Deferred<T>>.treeReduceRange(
+    fromIndex: Int,
+    toIndex: Int,
     convolve: suspend (left: T, right: T) -> T,
 ): T {
-    val mid = size / 2
-    val left = subList(0, mid)
-    val right = subList(mid, size)
+    val length = toIndex - fromIndex
+    if (length == 1) return this[fromIndex].await()
+    val mid = fromIndex + (length ushr 1)
 
     return convolve(
-        left.treeReduce(convolve),
-        right.treeReduce(convolve),
+        treeReduceRange(fromIndex, mid, convolve),
+        treeReduceRange(mid, toIndex, convolve),
     )
 }
