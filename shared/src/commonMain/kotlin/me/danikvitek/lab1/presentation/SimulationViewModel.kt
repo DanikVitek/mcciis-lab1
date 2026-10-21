@@ -85,15 +85,18 @@ class SimulationViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
 
             preserveTopology: Boolean = false,
         ) {
-            simulation?.cancel()
+            val prevSimulation = simulation
+            prevSimulation?.cancel()
             plotter.reset()
 
+            val keepPrevious = preserveTopology && prevSimulation != null && prevSimulation.graph.cities.size == citiesAmount
             val cityGraph =
-                if (preserveTopology && simulation != null)
-                    simulation!!.graph.let {
+                if (keepPrevious)
+                    prevSimulation.graph.let {
                         CityGraph(
                             cities = it.cities,
                             roads = it.mutableRoads.resetAllPheromones(initialPheromoneLevel),
+                            customRoadLengths = it.customRoadLengths,
                         )
                     }
                 else
@@ -101,6 +104,7 @@ class SimulationViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
                         initialPheromoneLevel = initialPheromoneLevel,
                         citiesAmount = citiesAmount,
                     )
+            val previousBestRoute = if (keepPrevious) prevSimulation.bestRouteSoFar else CyclicRoute()
             val weightingConfig = weightingConfig {
                 pheromoneImportance(pheromoneImportance)
                 distanceImportance(distanceImportance)
@@ -114,6 +118,7 @@ class SimulationViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
                 eliteAntsFraction = eliteAntsPercent / 100,
                 graph = cityGraph,
                 weightingConfig = weightingConfig,
+                initialBestRoute = previousBestRoute,
             ).also {
                 mapState.value = MapState(
                     cities = it.graph.cities,

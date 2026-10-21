@@ -12,11 +12,17 @@ import kotlin.random.Random
 class CityGraph private constructor(
     val cities: List<Offset>,
     roads: MutableRoads,
+    val customRoadLengths: Map<Road, Float>? = null,
     validate: Boolean,
 ) {
-    internal constructor(cities: List<Offset>, roads: MutableRoads) : this(
-        cities,
-        roads,
+    internal constructor(
+        cities: List<Offset>,
+        roads: MutableRoads,
+        customRoadLengths: Map<Road, Float>? = null,
+    ) : this(
+        cities = cities,
+        roads = roads,
+        customRoadLengths = customRoadLengths,
         validate = true,
     )
 
@@ -48,7 +54,7 @@ class CityGraph private constructor(
     companion object {
         fun fullyConnected(initialPheromoneLevel: Float, cities: List<Offset>): CityGraph {
             val roads = MutableRoads(cities.size, initialPheromoneLevel)
-            return CityGraph(cities, roads, validate = false)
+            return CityGraph(cities, roads, customRoadLengths = null, validate = false)
         }
 
         context(rng: Random)
@@ -114,7 +120,8 @@ class CityGraph private constructor(
             val road = packed[e]
             val c1 = road.toInt()
             val c2 = (road ushr 32).toInt()
-            val dist = (cities[c1] - cities[c2]).getDistance()
+            val customDist = customRoadLengths?.get(Road(road))
+            val dist = (customDist ?: (cities[c1] - cities[c2]).getDistance()).coerceAtLeast(1e-6f)
             edgeDistances[e] = dist
             edgeInvDistances[e] = 1f / dist
             degrees[c1]++
@@ -190,7 +197,7 @@ class CityGraph private constructor(
         }
     }
 
-    internal fun hasRoad(city1: Int, city2: Int): Boolean {
+    fun hasRoad(city1: Int, city2: Int): Boolean {
         if (city1 == city2) return false
         val fcCount = mutableRoads.fullyConnectedCitiesCount
         if (fcCount > 0) {
@@ -202,8 +209,37 @@ class CityGraph private constructor(
     internal fun edgeIndex(city1: Int, city2: Int): Int =
         mutableRoads.indexOfCities(city1, city2)
 
-    internal fun distanceBetween(city1: Int, city2: Int): Float =
+    fun distanceBetween(city1: Int, city2: Int): Float =
         edgeDistances[mutableRoads.indexOfCities(city1, city2)]
+
+    /**
+     * Validates that [routeCities] forms a complete Hamiltonian cycle on this graph
+     * and returns a [CyclicRoute] with the calculated total length, or `null` if invalid.
+     */
+    fun validateRoute(routeCities: List<Int>): CyclicRoute? {
+        val n = cities.size
+        if (n < 2 || routeCities.size != n) return null
+        val seen = BooleanArray(n)
+        for (c in routeCities) {
+            if (c !in 0..<n || seen[c]) return null
+            seen[c] = true
+        }
+        var totalLength = 0f
+        if (n == 2) {
+            val u = routeCities[0]
+            val v = routeCities[1]
+            if (!hasRoad(u, v)) return null
+            totalLength = distanceBetween(u, v) * 2f
+        } else {
+            for (i in 0..<n) {
+                val u = routeCities[i]
+                val v = routeCities[(i + 1) % n]
+                if (!hasRoad(u, v)) return null
+                totalLength += distanceBetween(u, v)
+            }
+        }
+        return CyclicRoute(routeCities, totalLength)
+    }
 
     context(weighting: WeightingConfig)
     fun accessibleCities(from: Int): PersistentMap<Int, Float> {

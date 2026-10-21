@@ -13,6 +13,7 @@ class Simulation(
     eliteAntsFraction: Float = 0f,
     private val weightingConfig: WeightingConfig = weightingConfig {},
     private val rng: Random = Random.Default,
+    initialBestRoute: CyclicRoute = CyclicRoute(),
 ) {
     init {
         require(ages > 0) { "Ages must be greater than 0" }
@@ -138,8 +139,18 @@ class Simulation(
     var currentAge = 0
         private set
 
-    var bestRouteSoFar = CyclicRoute()
+    var bestRouteSoFar = graph.validateRoute(initialBestRoute.cities) ?: CyclicRoute()
         private set
+
+    init {
+        // Warm-start: if we have a valid previous best route, seed initial pheromone boost along its edges
+        if (bestRouteSoFar.isNotEmpty() && bestRouteSoFar.length.isFinite() && bestRouteSoFar.length > 0f) {
+            val initialBoost = weightingConfig.pheromoneDepositMultiplier / bestRouteSoFar.length
+            for (road in bestRouteSoFar.roads) {
+                graph.mutableRoads.computeIfPresent(road.city1, road.city2) { it + initialBoost }
+            }
+        }
+    }
 
     private var coroutine: CoroutineScope? = null
     suspend fun cancel() {

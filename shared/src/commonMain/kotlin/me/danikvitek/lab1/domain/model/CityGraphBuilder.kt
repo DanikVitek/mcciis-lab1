@@ -7,16 +7,30 @@ class CityGraphBuilder(val initialPheromoneLevel: Float) {
         field = mutableListOf<Offset>()
     val roads: Roads
         field = MutableRoads()
+    private val customRoadLengths = mutableMapOf<Road, Float>()
 
     fun city(x: Float, y: Float): CityIndex {
         cities.add(Offset(x, y))
         return CityIndex(cities.lastIndex)
     }
 
-    fun road(city1: CityIndex, city2: CityIndex, pheromone: Float = initialPheromoneLevel) =
-        roads.put(city1.value, city2.value, pheromone)
+    fun road(
+        city1: CityIndex,
+        city2: CityIndex,
+        pheromone: Float = initialPheromoneLevel,
+        lengthKm: Float? = null,
+    ): Float? {
+        if (lengthKm != null) {
+            customRoadLengths[Road(city1.value, city2.value)] = lengthKm
+        }
+        return roads.put(city1.value, city2.value, pheromone)
+    }
 
-    internal fun build() = CityGraph(cities, roads)
+    internal fun build() = CityGraph(
+        cities = cities,
+        roads = roads,
+        customRoadLengths = customRoadLengths.takeIf { it.isNotEmpty() },
+    )
 }
 
 @JvmInline

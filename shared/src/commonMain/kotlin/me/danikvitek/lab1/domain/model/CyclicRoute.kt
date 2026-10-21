@@ -1,6 +1,6 @@
 package me.danikvitek.lab1.domain.model
 
-class CyclicRoute internal constructor(cities: List<Int> = emptyList(), val length: Float = Float.POSITIVE_INFINITY) :
+class CyclicRoute(cities: List<Int> = emptyList(), val length: Float = Float.POSITIVE_INFINITY) :
         Collection<Road> {
     init {
         require(cities.isEmpty() || cities.size >= 2)
@@ -24,6 +24,23 @@ class CyclicRoute internal constructor(cities: List<Int> = emptyList(), val leng
         buildList(n) {
             for (i in 0..<n) {
                 add(cities[(minIndex + i) % n])
+            }
+        }
+    }
+
+    /**
+     * Returns the cities of this cyclic route rotated so that the tour starts at [startCity]
+     * (if [startCity] is part of the route).
+     */
+    fun citiesStartingFrom(startCity: Int): List<Int> {
+        val norm = cities
+        if (norm.isEmpty()) return emptyList()
+        val idx = norm.indexOf(startCity)
+        if (idx <= 0) return norm
+        val n = norm.size
+        return buildList(n) {
+            for (i in 0..<n) {
+                add(norm[(idx + i) % n])
             }
         }
     }
