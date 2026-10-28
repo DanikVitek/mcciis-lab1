@@ -40,6 +40,7 @@ data class MapState(
 
 class SimulationViewModel(private val plotter: Plotter = getPlotter()) : ViewModel() {
     private var simulation: Simulation? = null
+    private var lastDistribution: GraphDistribution? = null
     val simStatusState: StateFlow<SimulationStatus>
         field = MutableStateFlow(SimulationStatus.UNINITIALIZED)
     val mapState: StateFlow<MapState>
@@ -54,7 +55,7 @@ class SimulationViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         val simStatus by this@SimulationViewModel::simStatusState
         val ageState by this@SimulationViewModel::ageState
 
-        context(_: Random)
+        context(rng: Random)
         suspend fun reset(
             @IntRange(from = 1)
             ages: Int,
@@ -83,14 +84,20 @@ class SimulationViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
             @FloatRange(from = 0.0, fromInclusive = false)
             initialPheromoneLevel: Float = 0.01F,
 
+            distribution: GraphDistribution = GraphDistribution.RANDOM_UNIFORM,
             preserveTopology: Boolean = false,
             reuseBestRoute: Boolean = true,
         ) {
             val prevSimulation = simulation
+            simulation = null
             prevSimulation?.cancel()
             plotter.reset()
 
-            val keepPrevious = preserveTopology && prevSimulation != null && prevSimulation.graph.cities.size == citiesAmount
+            val keepPrevious = preserveTopology &&
+                prevSimulation != null &&
+                prevSimulation.graph.cities.size == citiesAmount &&
+                lastDistribution == distribution
+            lastDistribution = distribution
             val cityGraph =
                 if (keepPrevious)
                     prevSimulation.graph.let {
@@ -101,10 +108,20 @@ class SimulationViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
                         )
                     }
                 else
-                    CityGraph.randomFullyConnected(
-                        initialPheromoneLevel = initialPheromoneLevel,
-                        citiesAmount = citiesAmount,
-                    )
+                    when (distribution) {
+                        GraphDistribution.RANDOM_UNIFORM -> CityGraph.randomFullyConnected(
+                            initialPheromoneLevel = initialPheromoneLevel,
+                            citiesAmount = citiesAmount,
+                        )
+                        GraphDistribution.RING -> CityGraph.ringFullyConnected(
+                            initialPheromoneLevel = initialPheromoneLevel,
+                            citiesAmount = citiesAmount,
+                        )
+                        GraphDistribution.NATURAL_GRID -> CityGraph.naturalGrid(
+                            initialPheromoneLevel = initialPheromoneLevel,
+                            citiesAmount = citiesAmount,
+                        )
+                    }
             val previousBestRoute = if (keepPrevious && reuseBestRoute) prevSimulation.bestRouteSoFar else CyclicRoute()
             val weightingConfig = weightingConfig {
                 pheromoneImportance(pheromoneImportance)
@@ -119,11 +136,12 @@ class SimulationViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
                 eliteAntsFraction = eliteAntsPercent / 100,
                 graph = cityGraph,
                 weightingConfig = weightingConfig,
+                rng = rng,
                 initialBestRoute = previousBestRoute,
             ).also {
                 mapState.value = MapState(
                     cities = it.graph.cities,
-                    roads = it.graph.roads,
+                    roads = it.graph.mutableRoads.copy(),
                 )
                 this@SimulationViewModel.ageState.value = it.currentAge
                 bestRouteState.value = it.bestRouteSoFar
@@ -131,18 +149,31 @@ class SimulationViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
             this@SimulationViewModel.simStatusState.value = SimulationStatus.NOT_STARTED
         }
 
+        fun start() {
+            if (simulation != null && simStatusState.value == SimulationStatus.NOT_STARTED) {
+                this@SimulationViewModel.simStatusState.value = SimulationStatus.RUNNING
+            }
+        }
+
         suspend fun step() {
-            this@SimulationViewModel.simStatusState.value = simulation?.run {
-                if (simStatus.value == SimulationStatus.FINISHED) return@run SimulationStatus.FINISHED
-                val finished = tick()
-                plotter.recordIteration(bestRouteSoFar.length)
-                mapState.update {
-                    it.copy(roads = graph.roads)
-                }
-                this@SimulationViewModel.ageState.value = currentAge
-                bestRouteState.value = bestRouteSoFar
-                return@run if (finished) SimulationStatus.FINISHED else SimulationStatus.RUNNING
-            } ?: SimulationStatus.UNINITIALIZED
+            val currentSim = simulation ?: run {
+                this@SimulationViewModel.simStatusState.value = SimulationStatus.UNINITIALIZED
+                return
+            }
+            if (simStatus.value == SimulationStatus.FINISHED) return
+            this@SimulationViewModel.simStatusState.value = SimulationStatus.RUNNING
+            val finished = currentSim.tick()
+            if (simulation !== currentSim) return
+            if (currentSim.bestRouteSoFar.length.isFinite()) {
+                plotter.recordIteration(currentSim.bestRouteSoFar.length)
+            }
+            mapState.update {
+                it.copy(roads = currentSim.graph.mutableRoads.copy())
+            }
+            this@SimulationViewModel.ageState.value = currentSim.currentAge
+            bestRouteState.value = currentSim.bestRouteSoFar
+            this@SimulationViewModel.simStatusState.value =
+                if (finished) SimulationStatus.FINISHED else SimulationStatus.RUNNING
         }
     }
 }

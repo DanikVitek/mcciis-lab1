@@ -7,11 +7,14 @@ import me.danikvitek.lab1.data.MapPresets
 import me.danikvitek.lab1.domain.Simulation
 import me.danikvitek.lab1.domain.layout.GraphLayoutEngine
 import me.danikvitek.lab1.domain.model.*
+import me.danikvitek.lab1.presentation.SimulationStatus
 import me.danikvitek.lab1.presentation.SimulationViewModel
+import me.danikvitek.lab1.util.SafeSeededRandom
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class TaskSolverTest {
@@ -111,7 +114,12 @@ class TaskSolverTest {
                 pheromoneImportance = 3f,
                 preserveTopology = false,
             )
+            val initialMapState = viewModel.mapState.value
             controller.step()
+            val afterStepMapState = viewModel.mapState.value
+            // Pheromones in mapState must update on step() rather than being swallowed by in-place mutation
+            assertNotEquals(initialMapState, afterStepMapState)
+
             val foundRoute = viewModel.bestRouteState.value
             assertTrue(foundRoute.isNotEmpty())
 
@@ -135,6 +143,56 @@ class TaskSolverTest {
                 reuseBestRoute = false,
             )
             assertTrue(viewModel.bestRouteState.value.isEmpty())
+        }
+    }
+
+    @Test
+    fun testRingAndNaturalGridDistributions() = runBlocking {
+        val viewModel = SimulationViewModel()
+        val controller = viewModel.SimulationController()
+        val rng = SafeSeededRandom(12345)
+
+        context(rng) {
+            // 1. Ring distribution
+            controller.reset(
+                ages = 5,
+                citiesAmount = 12,
+                distanceImportance = 1f,
+                pheromoneImportance = 3f,
+                distribution = GraphDistribution.RING,
+            )
+            assertEquals(12, viewModel.mapState.value.cities.size)
+            assertEquals(12 * 11 / 2, viewModel.mapState.value.roads.size)
+            controller.start()
+            assertEquals(SimulationStatus.RUNNING, viewModel.simStatusState.value)
+            while (viewModel.simStatusState.value == SimulationStatus.RUNNING) {
+                controller.step()
+            }
+            assertEquals(SimulationStatus.FINISHED, viewModel.simStatusState.value)
+            assertTrue(viewModel.bestRouteState.value.isNotEmpty())
+            assertTrue(viewModel.bestRouteState.value.length.isFinite())
+
+            // 2. Natural grid distribution (sparse graph without universal direct long-range connections)
+            val citiesCount = 30
+            controller.reset(
+                ages = 10,
+                citiesAmount = citiesCount,
+                distanceImportance = 1f,
+                pheromoneImportance = 3f,
+                distribution = GraphDistribution.NATURAL_GRID,
+            )
+            val maxPossibleRoads = citiesCount * (citiesCount - 1) / 2
+            val actualRoads = viewModel.mapState.value.roads.size
+            assertEquals(citiesCount, viewModel.mapState.value.cities.size)
+            assertTrue(actualRoads < maxPossibleRoads, "Expected natural grid to be sparser than complete graph ($actualRoads < $maxPossibleRoads)")
+
+            controller.start()
+            while (viewModel.simStatusState.value == SimulationStatus.RUNNING) {
+                controller.step()
+            }
+            assertEquals(SimulationStatus.FINISHED, viewModel.simStatusState.value)
+            assertTrue(viewModel.bestRouteState.value.isNotEmpty())
+            assertTrue(viewModel.bestRouteState.value.length.isFinite())
         }
     }
 

@@ -278,6 +278,20 @@ class MutableRoads : AbstractMutableMap<Road, Float>, Roads {
         }
     }
 
+    internal fun copy(): MutableRoads {
+        val copy = MutableRoads()
+        copy.packedRoads = packedRoads.copyOf(size)
+        copy.pheromones = pheromones.copyOf(size)
+        copy.size = size
+        copy.fullyConnectedCitiesCount = fullyConnectedCitiesCount
+        if (fullyConnectedCitiesCount == 0) {
+            copy.hashKeys = hashKeys.copyOf()
+            copy.hashIndices = hashIndices.copyOf()
+            copy.hashMask = hashMask
+        }
+        return copy
+    }
+
     internal fun resetAllPheromones(initialPheromoneLevel: Float): MutableRoads {
         val copy = MutableRoads()
         copy.packedRoads = packedRoads.copyOf(size)

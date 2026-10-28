@@ -3,11 +3,14 @@ package me.danikvitek.lab1.domain.model
 import androidx.compose.ui.geometry.Offset
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.mutate
-import kotlin.math.cos
-import kotlin.math.pow
-import kotlin.math.sin
+import kotlin.math.*
 import kotlin.random.Random
 
+enum class GraphDistribution {
+    RANDOM_UNIFORM,
+    RING,
+    NATURAL_GRID,
+}
 
 class CityGraph private constructor(
     val cities: List<Offset>,
@@ -71,10 +74,12 @@ class CityGraph private constructor(
                 val maxX = initialPositions.maxOf { it.x }
                 val minY = initialPositions.minOf { it.y }
                 val maxY = initialPositions.maxOf { it.y }
+                val spanX = (maxX - minX).takeIf { it > 0f } ?: 1f
+                val spanY = (maxY - minY).takeIf { it > 0f } ?: 1f
                 initialPositions.map { position ->
                     Offset(
-                        x = (position.x - minX) / (maxX - minX),
-                        y = (position.y - minY) / (maxY - minY),
+                        x = (position.x - minX) / spanX,
+                        y = (position.y - minY) / spanY,
                     )
                 }
             },
@@ -92,6 +97,117 @@ class CityGraph private constructor(
                 }
             },
         )
+
+        context(rng: Random)
+        fun naturalGrid(initialPheromoneLevel: Float, citiesAmount: Int): CityGraph {
+            require(citiesAmount >= 2) { "Cities amount must be at least 2" }
+            if (citiesAmount <= 3) {
+                return randomFullyConnected(initialPheromoneLevel, citiesAmount)
+            }
+
+            val rows = sqrt(citiesAmount.toDouble()).toInt().coerceAtLeast(2)
+            val baseCols = citiesAmount / rows
+            val extraCols = citiesAmount % rows
+            val colsInRow = IntArray(rows) { r -> baseCols + if (r < extraCols) 1 else 0 }
+            val rowOffsets = IntArray(rows)
+            for (r in 1..<rows) {
+                rowOffsets[r] = rowOffsets[r - 1] + colsInRow[r - 1]
+            }
+
+            fun cityIndex(r: Int, c: Int): Int = rowOffsets[r] + c
+
+            val rawPositions = ArrayList<Offset>(citiesAmount)
+            for (r in 0..<rows) {
+                val cols = colsInRow[r]
+                for (c in 0..<cols) {
+                    val jitterX = (rng.nextFloat() - 0.5f) * (0.6f / cols)
+                    val jitterY = (rng.nextFloat() - 0.5f) * (0.6f / rows)
+                    rawPositions.add(
+                        Offset(
+                            x = (c + 0.5f) / cols + jitterX,
+                            y = (r + 0.5f) / rows + jitterY,
+                        )
+                    )
+                }
+            }
+
+            val minX = rawPositions.minOf { it.x }
+            val maxX = rawPositions.maxOf { it.x }
+            val minY = rawPositions.minOf { it.y }
+            val maxY = rawPositions.maxOf { it.y }
+            val spanX = (maxX - minX).takeIf { it > 0f } ?: 1f
+            val spanY = (maxY - minY).takeIf { it > 0f } ?: 1f
+            val cities = rawPositions.map { pos ->
+                Offset(
+                    x = (pos.x - minX) / spanX,
+                    y = (pos.y - minY) / spanY,
+                )
+            }
+
+            val roads = MutableRoads()
+
+            // 1. Primary grid connections (horizontal & vertical/diagonal adjacent grid cells)
+            for (r in 0..<rows) {
+                val cols = colsInRow[r]
+                for (c in 0..<cols - 1) {
+                    roads.put(cityIndex(r, c), cityIndex(r, c + 1), initialPheromoneLevel)
+                }
+                if (r + 1 < rows) {
+                    val nextCols = colsInRow[r + 1]
+                    val maxNormalizedColDiff = 1.35f / minOf(cols, nextCols)
+                    for (c1 in 0..<cols) {
+                        val u1 = (c1 + 0.5f) / cols
+                        for (c2 in 0..<nextCols) {
+                            val u2 = (c2 + 0.5f) / nextCols
+                            if (abs(u1 - u2) <= maxNormalizedColDiff) {
+                                roads.put(cityIndex(r, c1), cityIndex(r + 1, c2), initialPheromoneLevel)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Gabriel graph proximity edges (natural planar neighborhood)
+            for (i in 0..<citiesAmount) {
+                val pi = cities[i]
+                for (j in i + 1..<citiesAmount) {
+                    if (roads.indexOfCities(i, j) >= 0) continue
+                    val pj = cities[j]
+                    val dijSq = (pi - pj).getDistanceSquared()
+                    var isGabriel = true
+                    for (k in 0..<citiesAmount) {
+                        if (k == i || k == j) continue
+                        val pk = cities[k]
+                        if ((pi - pk).getDistanceSquared() + (pj - pk).getDistanceSquared() < dijSq) {
+                            isGabriel = false
+                            break
+                        }
+                    }
+                    if (isGabriel) {
+                        roads.put(i, j, initialPheromoneLevel)
+                    }
+                }
+            }
+
+            // 3. Rare medium/long-range regional connections with steep distance decay
+            val cellSpacing = 1f / sqrt(citiesAmount.toFloat())
+            for (i in 0..<citiesAmount) {
+                val pi = cities[i]
+                for (j in i + 1..<citiesAmount) {
+                    if (roads.indexOfCities(i, j) >= 0) continue
+                    val dist = (pi - cities[j]).getDistance()
+                    val normalizedDist = (dist / cellSpacing) - 1f
+                    if (normalizedDist > 0f) {
+                        val prob = 0.25f * exp(-1.1f * normalizedDist * normalizedDist)
+                        if (rng.nextFloat() < prob) {
+                            roads.put(i, j, initialPheromoneLevel)
+                        }
+                    }
+                }
+            }
+
+            return CityGraph(cities, roads, customRoadLengths = null, validate = false)
+        }
     }
 
     internal val mutableRoads: MutableRoads = roads

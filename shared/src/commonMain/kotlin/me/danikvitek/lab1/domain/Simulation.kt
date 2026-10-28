@@ -68,16 +68,15 @@ class Simulation(
         val qValue = weightingConfig.pheromoneDepositMultiplier
         val bestRoute = bestRouteSoFar
         val edgeDistances = graph.edgeDistances
+        val citiesAmount = graph.cities.size
 
         for (antIndex in ants.indices) {
             val ant = ants[antIndex]
             val pos = ant.position
             val start = ant.startPosition
-            // Some routes may be incomplete, so we don't want to deposit pheromones for them
-            if (!graph.hasRoad(pos, start)) continue
-
             val visitedCount = ant.visitedCount
-            if (visitedCount == 0) continue
+            // Some routes may be incomplete, so we don't want to deposit pheromones for them
+            if (visitedCount == 0 || visitedCount + 1 < citiesAmount || !graph.hasRoad(pos, start)) continue
             val visitedOrder = ant.visitedOrder
 
             if (ant.isElite) {
@@ -164,6 +163,7 @@ class Simulation(
         val citiesAmount = graph.cities.size
         val neighborCities = graph.neighborCities
         val neighborWeights = graph.neighborWeights
+        val isFullyConnected = graph.mutableRoads.fullyConnectedCitiesCount > 0
 
         graph.refreshWeights(weightingConfig)
 
@@ -173,20 +173,54 @@ class Simulation(
             for ((index, ant) in ants.withIndex()) {
                 antJobs.add(
                     async(antCoroutineNames[index]) {
-                        do {
-                            val currentPos = ant.position
-                            val stuckOrFinished = ant.chooseNext(
-                                neighborCities[currentPos],
-                                neighborWeights[currentPos],
-                            ) == Ant.ChoiceResult.STAYED
-                            val stuck = stuckOrFinished &&
-                                        (!graph.hasRoad(ant.position, ant.startPosition) ||
-                                         ant.visitedCount + 1 < citiesAmount)
-                            if (stuck) {
-                                return@async null
+                        if (isFullyConnected) {
+                            do {
+                                val currentPos = ant.position
+                                val moveResult = ant.chooseNext(
+                                    neighborCities[currentPos],
+                                    neighborWeights[currentPos],
+                                )
+                                val stuckOrFinished = moveResult == Ant.ChoiceResult.STAYED
+                                val stuck = stuckOrFinished &&
+                                            (!graph.hasRoad(ant.position, ant.startPosition) ||
+                                             ant.visitedCount + 1 < citiesAmount)
+                                if (stuck) {
+                                    return@async null
+                                }
+                                yield()
+                            } while (!stuckOrFinished)
+                        } else {
+                            val triedMasks = LongArray(citiesAmount)
+                            var backtracksRemaining = citiesAmount * 16
+                            var steps = 0
+                            while (true) {
+                                val depth = ant.visitedCount
+                                val chosenIdx = ant.chooseNextSparse(graph, triedMasks[depth])
+                                if (chosenIdx >= 0) {
+                                    if (chosenIdx < 64) {
+                                        triedMasks[depth] = triedMasks[depth] or (1L shl chosenIdx)
+                                    }
+                                    val newDepth = ant.visitedCount
+                                    if (newDepth < citiesAmount) {
+                                        triedMasks[newDepth] = 0L
+                                    }
+                                    if (newDepth + 1 == citiesAmount && graph.hasRoad(ant.position, ant.startPosition)) {
+                                        break
+                                    }
+                                } else {
+                                    if (ant.visitedCount + 1 == citiesAmount && graph.hasRoad(ant.position, ant.startPosition)) {
+                                        break
+                                    }
+                                    if (backtracksRemaining <= 0 || !ant.backtrack()) {
+                                        return@async null
+                                    }
+                                    backtracksRemaining--
+                                }
+                                if ((++steps and 31) == 0) {
+                                    yield()
+                                }
                             }
-                            yield()
-                        } while (!stuckOrFinished)
+                        }
 
                         val visitedOrder = ant.visitedOrder
                         val visitedCount = ant.visitedCount

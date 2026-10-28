@@ -131,6 +131,10 @@
     <!-- Experiment Runner Screen -->
     <string name="exp_plot_desc">Графік довжини найкоротшого знайденого маршруту</string>
     <string name="exp_canvas_desc">Симуляція мурашиної колонії</string>
+    <string name="param_graph_distribution">Розподіл міст і доріг</string>
+    <string name="dist_random_uniform">Випадковий рівномірний (повнозв’язний)</string>
+    <string name="dist_ring">Кільцевий (повнозв’язний)</string>
+    <string name="dist_natural_grid">Природна сітка (локальні дороги)</string>
     <string name="param_rng_seed">Зерно ГВЧ (RNG seed)</string>
     <string name="param_rng_seed_blank_hint">Порожнє поле використовує системну ентропію</string>
     <string name="param_cities_amount">Кількість міст</string>

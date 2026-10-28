@@ -22,6 +22,7 @@ import lab1.shared.generated.resources.*
 import me.danikvitek.lab1.CanvasOrPlot
 import me.danikvitek.lab1.data.PlotProvider
 import me.danikvitek.lab1.domain.model.CyclicRoute
+import me.danikvitek.lab1.domain.model.GraphDistribution
 import me.danikvitek.lab1.presentation.MapState
 import me.danikvitek.lab1.presentation.SimulationStatus
 import me.danikvitek.lab1.presentation.SimulationViewModel
@@ -30,10 +31,18 @@ import me.danikvitek.lab1.presentation.fieldState.ValidatedField
 import me.danikvitek.lab1.presentation.fieldState.rememberFloatFieldState
 import me.danikvitek.lab1.presentation.fieldState.rememberIntFieldState
 import me.danikvitek.lab1.util.SafeSeededRandom
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.ceil
 import kotlin.math.pow
 import kotlin.random.Random
+
+private val GraphDistribution.labelRes: StringResource
+    get() = when (this) {
+        GraphDistribution.RANDOM_UNIFORM -> Res.string.dist_random_uniform
+        GraphDistribution.RING -> Res.string.dist_ring
+        GraphDistribution.NATURAL_GRID -> Res.string.dist_natural_grid
+    }
 
 @Composable
 fun ExperimentRunnerScreen(
@@ -44,9 +53,14 @@ fun ExperimentRunnerScreen(
 
     val bestRouteState = viewModel.bestRouteState.collectAsState()
     val bestRoute by bestRouteState
+    val age by viewModel.ageState.collectAsState()
 
-    val plotProviderState = remember(bestRoute) { derivedStateOf { viewModel.plot(map.cities.size) } }
+    val plotProviderState = remember(bestRoute, age, map.cities.size) {
+        derivedStateOf { viewModel.plot(map.cities.size) }
+    }
     val plotProvider by plotProviderState
+
+    val simulationController = remember(viewModel) { viewModel.SimulationController() }
 
     val showPheromones = remember { mutableStateOf(true) }
     val showBestRoute = remember { mutableStateOf(true) }
@@ -104,7 +118,7 @@ fun ExperimentRunnerScreen(
         SimulationControls(
             modifier = Modifier.fillMaxHeight(),
             bestRouteLengthState = derivedStateOf { bestRoute.length },
-            simulationController = viewModel.SimulationController(),
+            simulationController = simulationController,
             showPheromones = showPheromones,
             showBestRoute = showBestRoute,
             plotProviderState = plotProviderState,
@@ -141,49 +155,57 @@ fun MapCanvas(
         )
 
         if (showPheromones) {
-            val maxLevel = mapState.roads.maxOfOrNull { it.value }
-            for ((road, level) in mapState.roads) {
-                val intensity = level / maxLevel!!
+            val maxLevel = mapState.roads.values.maxOrNull()?.takeIf { it > 0f }
+            if (maxLevel != null) {
+                for ((road, level) in mapState.roads) {
+                    if (road.city1 !in mapState.cities.indices || road.city2 !in mapState.cities.indices) continue
+                    val intensity = (level / maxLevel).coerceIn(0.01f, 1f)
 
-                val lineStart = mapState.cities[road.city1].toCanvasPos()
-                val lineEnd = mapState.cities[road.city2].toCanvasPos()
+                    val lineStart = mapState.cities[road.city1].toCanvasPos()
+                    val lineEnd = mapState.cities[road.city2].toCanvasPos()
+                    val delta = lineEnd - lineStart
+                    val dist = delta.getDistance()
+                    if (dist < 1e-3f) continue
 
-                val lineMid = (lineStart + lineEnd) / 2f
-                val lineNormal = (lineEnd - lineStart).let { it / it.getDistance() }.let { Offset(-it.y, it.x) }
+                    val lineMid = (lineStart + lineEnd) / 2f
+                    val lineNormal = (delta / dist).let { Offset(-it.y, it.x) }
 
-                val brushWidth = (intensity * 10.dp.toPx()).coerceAtLeast(1.dp.toPx())
-                val brushStart = lineMid - lineNormal * brushWidth
-                val brushEnd = lineMid + lineNormal * brushWidth
+                    val brushWidth = (intensity * 10.dp.toPx()).coerceAtLeast(1.dp.toPx())
+                    val brushStart = lineMid - lineNormal * brushWidth
+                    val brushEnd = lineMid + lineNormal * brushWidth
 
-                drawLine(
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.0625f.pow(1f / intensity)), intensity),
-                            lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.25f.pow(1f / intensity)), intensity),
-                            lerp(Color.Blue.copy(alpha = 0f), Color.Red, intensity),
-                            lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.25f.pow(1f / intensity)), intensity),
-                            lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.0625f.pow(1f / intensity)), intensity),
-                            Color.Transparent,
+                    drawLine(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.0625f.pow(1f / intensity)), intensity),
+                                lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.25f.pow(1f / intensity)), intensity),
+                                lerp(Color.Blue.copy(alpha = 0f), Color.Red, intensity),
+                                lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.25f.pow(1f / intensity)), intensity),
+                                lerp(Color.Blue.copy(alpha = 0f), Color.Red.copy(alpha = 0.0625f.pow(1f / intensity)), intensity),
+                                Color.Transparent,
+                            ),
+                            start = brushStart,
+                            end = brushEnd,
                         ),
-                        start = brushStart,
-                        end = brushEnd,
-                    ),
-                    start = lineStart,
-                    end = lineEnd,
-                    strokeWidth = brushWidth,
-                )
+                        start = lineStart,
+                        end = lineEnd,
+                        strokeWidth = brushWidth,
+                    )
+                }
             }
         }
 
         if (showBestRoute) {
             bestRoute.forEach { it ->
-                drawLine(
-                    color = Color.Green,
-                    start = mapState.cities[it.city1].toCanvasPos(),
-                    end = mapState.cities[it.city2].toCanvasPos(),
-                    strokeWidth = 2.dp.toPx(),
-                )
+                if (it.city1 in mapState.cities.indices && it.city2 in mapState.cities.indices) {
+                    drawLine(
+                        color = Color.Green,
+                        start = mapState.cities[it.city1].toCanvasPos(),
+                        end = mapState.cities[it.city2].toCanvasPos(),
+                        strokeWidth = 2.dp.toPx(),
+                    )
+                }
             }
         }
 
@@ -212,6 +234,7 @@ fun MapCanvas(
 const val MIN_CITIES_AMOUNT = 2
 const val MAX_CITIES_AMOUNT = 1000
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SimulationControls(
     modifier: Modifier = Modifier,
@@ -241,6 +264,9 @@ fun SimulationControls(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.Top,
     ) {
+        var distribution by remember { mutableStateOf(GraphDistribution.RANDOM_UNIFORM) }
+        var distributionExpanded by remember { mutableStateOf(false) }
+
         var seed by remember { mutableStateOf("") }
         val rng: Random by derivedStateOf {
             seed.takeUnless { it.isBlank() }
@@ -263,6 +289,39 @@ fun SimulationControls(
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Top),
         ) {
+            ExposedDropdownMenuBox(
+                expanded = distributionExpanded,
+                onExpandedChange = { distributionExpanded = it },
+            ) {
+                TextField(
+                    modifier = Modifier
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                        .fillMaxWidth(),
+                    readOnly = true,
+                    singleLine = true,
+                    value = stringResource(distribution.labelRes),
+                    onValueChange = {},
+                    label = { Text(stringResource(Res.string.param_graph_distribution)) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = distributionExpanded) },
+                    colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                )
+                ExposedDropdownMenu(
+                    expanded = distributionExpanded,
+                    onDismissRequest = { distributionExpanded = false },
+                ) {
+                    GraphDistribution.entries.forEach { entry ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(entry.labelRes)) },
+                            onClick = {
+                                distribution = entry
+                                distributionExpanded = false
+                            },
+                            contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                        )
+                    }
+                }
+            }
+
             TextField(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text(stringResource(Res.string.param_rng_seed)) },
@@ -365,6 +424,7 @@ fun SimulationControls(
                                     pheromoneImportance = pheromoneImportance,
                                     pheromoneDepositMultiplier = pheromoneDepositMultiplier,
                                     initialPheromoneLevel = initialPheromoneLevel,
+                                    distribution = distribution,
                                     preserveTopology = simStatus == SimulationStatus.RUNNING || simStatus == SimulationStatus.FINISHED,
                                     reuseBestRoute = reuseBestRoute,
                                 )
@@ -383,7 +443,7 @@ fun SimulationControls(
                 Button(
                     enabled = simStatus == SimulationStatus.NOT_STARTED,
                     onClick = {
-                        runBlocking { simulationController.step() }
+                        simulationController.start()
                     },
                 ) {
                     Text(

@@ -13,6 +13,6 @@ actual class SafeSeededRandom actual constructor(seed: Long) : Random() {
         get() = implStorage.get()
 
     override fun nextBits(bitCount: Int): Int {
-        return impl.nextInt(1 shl bitCount)
+        return if (bitCount == 0) 0 else impl.nextInt() ushr (32 - bitCount)
     }
 }

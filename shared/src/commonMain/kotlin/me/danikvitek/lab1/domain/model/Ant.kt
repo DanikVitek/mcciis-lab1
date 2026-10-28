@@ -52,6 +52,18 @@ class Ant(
         position = nextCity
     }
 
+    internal fun backtrack(): Boolean {
+        val count = visitedCount
+        if (count <= 0) return false
+        val prevCount = count - 1
+        val prevCity = visitedOrder[prevCount]
+        visitedCount = prevCount
+        val wordIndex = prevCity ushr 6
+        visitedBits[wordIndex] = visitedBits[wordIndex] and (1L shl prevCity).inv()
+        position = prevCity
+        return true
+    }
+
     internal fun isVisited(city: Int): Boolean {
         val wordIndex = city ushr 6
         return wordIndex < visitedBits.size && (visitedBits[wordIndex] and (1L shl city)) != 0L
@@ -118,6 +130,126 @@ class Ant(
         }
 
         return ChoiceResult.STAYED
+    }
+
+    /**
+     * Next city selection for sparse (non-complete) graphs that avoids 1-step dead ends,
+     * preserves the last remaining return edge to [startPosition] until the final step,
+     * and returns the chosen neighbor index in `graph.neighborCities[position]` (or `-1` if no move is valid).
+     */
+    context(rng: Random)
+    internal fun chooseNextSparse(graph: CityGraph, triedMask: Long = 0L): Int {
+        val citiesAmount = graph.cities.size
+        if (visitedCount + 1 >= citiesAmount) return -1
+
+        val currentPos = position
+        val allNeighbors = graph.neighborCities
+        val neighbors = allNeighbors[currentPos]
+        if (neighbors.isEmpty()) return -1
+        val weights = graph.neighborWeights[currentPos]
+
+        // Final step: only one unvisited city remains in the graph
+        if (visitedCount + 2 == citiesAmount) {
+            for (i in neighbors.indices) {
+                if (i < 64 && (triedMask and (1L shl i)) != 0L) continue
+                val city = neighbors[i]
+                if (city != currentPos && !isVisited(city) && graph.hasRoad(city, startPosition)) {
+                    moveTo(city)
+                    return i
+                }
+            }
+            return -1
+        }
+
+        // Check how many unvisited neighbors startPosition still has
+        val startNeighbors = allNeighbors[startPosition]
+        var startUnvisitedCount = 0
+        var lastStartNeighbor = -1
+        for (i in startNeighbors.indices) {
+            val u = startNeighbors[i]
+            if (u != currentPos && !isVisited(u)) {
+                startUnvisitedCount++
+                lastStartNeighbor = u
+                if (startUnvisitedCount > 1) break
+            }
+        }
+        if (startUnvisitedCount == 0) return -1
+        val reservedLastCity = if (startUnvisitedCount == 1) lastStartNeighbor else -1
+
+        var forcedNeighborIndex = -1
+        var validTotalWeight = 0f
+
+        for (i in neighbors.indices) {
+            val city = neighbors[i]
+            if (city == currentPos || isVisited(city)) continue
+
+            val nextNeighbors = allNeighbors[city]
+            var onwardCount = 0
+            for (j in nextNeighbors.indices) {
+                val w = nextNeighbors[j]
+                if (w != currentPos && w != city && !isVisited(w)) {
+                    onwardCount++
+                }
+            }
+
+            if (city == reservedLastCity) {
+                if (onwardCount == 0) return -1
+                continue
+            }
+
+            val connectsToStart = graph.hasRoad(city, startPosition)
+            val futureDegree = onwardCount + (if (connectsToStart) 1 else 0)
+            if (futureDegree == 0) return -1
+
+            if (futureDegree == 1) {
+                if (onwardCount == 0) return -1
+                if (forcedNeighborIndex != -1) return -1
+                forcedNeighborIndex = i
+            } else if (onwardCount > 0) {
+                val isTried = i < 64 && (triedMask and (1L shl i)) != 0L
+                if (!isTried) {
+                    val degreeFactor = 1f / (onwardCount * onwardCount)
+                    validTotalWeight += weights[i] * degreeFactor
+                }
+            }
+        }
+
+        if (forcedNeighborIndex != -1) {
+            val isTried = forcedNeighborIndex < 64 && (triedMask and (1L shl forcedNeighborIndex)) != 0L
+            if (isTried) return -1
+            moveTo(neighbors[forcedNeighborIndex])
+            return forcedNeighborIndex
+        }
+
+        if (validTotalWeight <= 0f) return -1
+
+        val target = rng.nextFloat() * validTotalWeight
+        var cumulativeWeight = 0f
+
+        for (i in neighbors.indices) {
+            if (i < 64 && (triedMask and (1L shl i)) != 0L) continue
+            val city = neighbors[i]
+            if (city == currentPos || city == reservedLastCity || isVisited(city)) continue
+
+            val nextNeighbors = allNeighbors[city]
+            var onwardCount = 0
+            for (j in nextNeighbors.indices) {
+                val w = nextNeighbors[j]
+                if (w != currentPos && w != city && !isVisited(w)) {
+                    onwardCount++
+                }
+            }
+            if (onwardCount == 0) continue
+
+            val degreeFactor = 1f / (onwardCount * onwardCount)
+            cumulativeWeight += weights[i] * degreeFactor
+            if (target <= cumulativeWeight) {
+                moveTo(city)
+                return i
+            }
+        }
+
+        return -1
     }
 
     /**

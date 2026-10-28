@@ -131,6 +131,10 @@
     <!-- Experiment Runner Screen -->
     <string name="exp_plot_desc">Plot of the length of the shortest path found so far</string>
     <string name="exp_canvas_desc">Ant colony simulation</string>
+    <string name="param_graph_distribution">Cities &amp; roads distribution</string>
+    <string name="dist_random_uniform">Random uniform (fully connected)</string>
+    <string name="dist_ring">Ring (fully connected)</string>
+    <string name="dist_natural_grid">Natural grid (local roads)</string>
     <string name="param_rng_seed">RNG seed</string>
     <string name="param_rng_seed_blank_hint">Blank seed will use a system’s entropy</string>
     <string name="param_cities_amount">Number of cities</string>
