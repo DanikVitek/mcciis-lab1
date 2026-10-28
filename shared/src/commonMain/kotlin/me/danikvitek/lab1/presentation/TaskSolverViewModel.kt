@@ -490,11 +490,11 @@ class TaskSolverViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
         val antsAmount = ceil(citiesCount * (antsPercent / 100f)).toInt().coerceAtLeast(1)
 
         // If Q is null (auto-mode), estimate Q from average road length * citiesCount
-        val autoQ = run {
+        val autoQ = {
             val avgRoad = currentMap.roadLengthsKm.values.average().toFloat().takeIf { it > 0f } ?: 100f
             (avgRoad * citiesCount).coerceAtLeast(1f)
         }
-        val effectiveQ = pheromoneDepositMultiplier ?: autoQ
+        val effectiveQ = pheromoneDepositMultiplier ?: autoQ()
 
         val cityGraph = currentMap.toCityGraph(initialPheromoneLevel)
         val weightingConfig = weightingConfig {
