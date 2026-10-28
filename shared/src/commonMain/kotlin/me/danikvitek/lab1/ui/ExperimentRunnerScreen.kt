@@ -226,6 +226,7 @@ fun SimulationControls(
     val age by simulationController.ageState.collectAsState()
     var showPheromones by showPheromones
     var showBestRoute by showBestRoute
+    var reuseBestRoute by remember { mutableStateOf(true) }
 
     LaunchedEffect(simStatus) {
         if (simStatus == SimulationStatus.RUNNING) {
@@ -365,6 +366,7 @@ fun SimulationControls(
                                     pheromoneDepositMultiplier = pheromoneDepositMultiplier,
                                     initialPheromoneLevel = initialPheromoneLevel,
                                     preserveTopology = simStatus == SimulationStatus.RUNNING || simStatus == SimulationStatus.FINISHED,
+                                    reuseBestRoute = reuseBestRoute,
                                 )
                             }
                         }
@@ -401,6 +403,16 @@ fun SimulationControls(
                 Text(
                     text = bestRouteLength.toString(),
                 )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Checkbox(
+                    checked = reuseBestRoute,
+                    onCheckedChange = { reuseBestRoute = it },
+                )
+                Text(text = stringResource(Res.string.reuse_best_route))
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,

@@ -144,6 +144,7 @@
     <string name="btn_reset">Reset</string>
     <string name="btn_run">Run</string>
     <string name="shortest_route_so_far">Shortest route length so far:</string>
+    <string name="reuse_best_route">Reuse previous best route</string>
     <string name="show_pheromones">Show pheromones</string>
     <string name="show_best_route">Show best route</string>
 

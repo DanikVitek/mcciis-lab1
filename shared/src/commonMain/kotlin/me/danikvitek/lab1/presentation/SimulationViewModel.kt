@@ -84,6 +84,7 @@ class SimulationViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
             initialPheromoneLevel: Float = 0.01F,
 
             preserveTopology: Boolean = false,
+            reuseBestRoute: Boolean = true,
         ) {
             val prevSimulation = simulation
             prevSimulation?.cancel()
@@ -104,7 +105,7 @@ class SimulationViewModel(private val plotter: Plotter = getPlotter()) : ViewMod
                         initialPheromoneLevel = initialPheromoneLevel,
                         citiesAmount = citiesAmount,
                     )
-            val previousBestRoute = if (keepPrevious) prevSimulation.bestRouteSoFar else CyclicRoute()
+            val previousBestRoute = if (keepPrevious && reuseBestRoute) prevSimulation.bestRouteSoFar else CyclicRoute()
             val weightingConfig = weightingConfig {
                 pheromoneImportance(pheromoneImportance)
                 distanceImportance(distanceImportance)

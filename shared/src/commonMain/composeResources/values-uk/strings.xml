@@ -144,6 +144,7 @@
     <string name="btn_reset">Скинути</string>
     <string name="btn_run">Запуск</string>
     <string name="shortest_route_so_far">Найкоротший маршрут наразі:</string>
+    <string name="reuse_best_route">Використовувати попередній найкращий маршрут</string>
     <string name="show_pheromones">Показувати феромони</string>
     <string name="show_best_route">Показувати найкращий маршрут</string>
 

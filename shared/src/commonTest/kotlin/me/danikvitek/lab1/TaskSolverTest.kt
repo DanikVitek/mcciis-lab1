@@ -7,6 +7,8 @@ import me.danikvitek.lab1.data.MapPresets
 import me.danikvitek.lab1.domain.Simulation
 import me.danikvitek.lab1.domain.layout.GraphLayoutEngine
 import me.danikvitek.lab1.domain.model.*
+import me.danikvitek.lab1.presentation.SimulationViewModel
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -93,6 +95,47 @@ class TaskSolverTest {
             // run all ages
         }
         assertTrue(sim.bestRouteSoFar.length <= 915f)
+    }
+
+    @Test
+    fun testExperimentRunnerReuseBestRouteFlag() = runBlocking {
+        val viewModel = SimulationViewModel()
+        val controller = viewModel.SimulationController()
+        val rng = Random(42)
+
+        context(rng) {
+            controller.reset(
+                ages = 5,
+                citiesAmount = 6,
+                distanceImportance = 1f,
+                pheromoneImportance = 3f,
+                preserveTopology = false,
+            )
+            controller.step()
+            val foundRoute = viewModel.bestRouteState.value
+            assertTrue(foundRoute.isNotEmpty())
+
+            // Reset with preserveTopology = true and default reuseBestRoute (true)
+            controller.reset(
+                ages = 5,
+                citiesAmount = 6,
+                distanceImportance = 1f,
+                pheromoneImportance = 3f,
+                preserveTopology = true,
+            )
+            assertEquals(foundRoute, viewModel.bestRouteState.value)
+
+            // Reset with preserveTopology = true and reuseBestRoute = false
+            controller.reset(
+                ages = 5,
+                citiesAmount = 6,
+                distanceImportance = 1f,
+                pheromoneImportance = 3f,
+                preserveTopology = true,
+                reuseBestRoute = false,
+            )
+            assertTrue(viewModel.bestRouteState.value.isEmpty())
+        }
     }
 
     @Test
