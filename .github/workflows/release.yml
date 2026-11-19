@@ -1,0 +1,128 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            os: ubuntu-latest
+            arch: x64
+            task: packageDistributionForCurrentOS
+            build_uber_jar: true
+          - name: windows-x64
+            os: windows-latest
+            arch: x64
+            task: packageMsi
+            build_uber_jar: false
+          - name: macos-arm64
+            os: macos-latest
+            arch: arm64
+            task: packageDmg
+            build_uber_jar: false
+          - name: macos-x64
+            os: macos-15-intel
+            arch: x64
+            task: packageDmg
+            build_uber_jar: false
+
+    env:
+      APPIMAGE_EXTRACT_AND_RUN: 1
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Linux packaging dependencies (rpm, file)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm file
+
+      - name: Build native packages (${{ matrix.task }})
+        shell: bash
+        run: |
+          ./gradlew :desktopApp:${{ matrix.task }} -PpackageVersion="${GITHUB_REF_NAME}" --no-daemon
+
+      - name: Build Universal Uber JAR
+        if: matrix.build_uber_jar == true
+        shell: bash
+        run: |
+          ./gradlew :desktopApp:packageUberJarForCurrentOS -PuniversalUberJar=true -PpackageVersion="${GITHUB_REF_NAME}" --no-daemon
+
+      - name: Collect release assets
+        shell: bash
+        run: |
+          mkdir -p release-assets
+
+          # Copy native binaries (.deb, .rpm, .AppImage, .msi, .dmg)
+          if [ -d "desktopApp/build/compose/binaries/main" ]; then
+            find desktopApp/build/compose/binaries/main -maxdepth 2 -type f \
+              \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.dmg" \) \
+              -exec cp {} release-assets/ \;
+          fi
+
+          # Disambiguate macOS DMG filenames by architecture (arm64 vs x64)
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            for dmg in release-assets/*.dmg; do
+              [ -e "$dmg" ] || continue
+              mv "$dmg" "${dmg%.dmg}-macos-${{ matrix.arch }}.dmg"
+            done
+          fi
+
+          # Copy Universal Uber JAR if built on this runner
+          if [ "${{ matrix.build_uber_jar }}" = "true" ] && [ -d "desktopApp/build/compose/jars" ]; then
+            find desktopApp/build/compose/jars -maxdepth 1 -type f -name "*.jar" \
+              -exec cp {} release-assets/ \;
+          fi
+
+          ls -la release-assets/
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.name }}
+          path: release-assets/*
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all built packages
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: packages-*
+          merge-multiple: true
+
+      - name: List collected release artifacts
+        run: ls -la artifacts/
+
+      - name: Create Release and attach packages
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: artifacts/*
